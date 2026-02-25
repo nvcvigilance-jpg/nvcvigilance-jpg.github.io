@@ -1,7 +1,7 @@
 
     // ==================== GOOGLE SHEETS CONFIGURATION ====================
 const GOOGLE_SHEETS_CONFIG = {
-  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyuHgIiD0GYAbCNHPgWrI2ZghiTTGJnus6lf-E2LNLYzUJPQWFziLQG2x7YuL5HdyBH5g/exec',
+  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzCto7O7ffF-D-nHi_h3NNjEAjYPTn9TO1ruJjNZZNZdch_Aq0BLQpgAM-wYP_P9VYQ8g/exec',
   API_KEY: 'nvc2026secretkey',
   ENABLED: true,
   USE_CORS_PROXY: false,
@@ -112,7 +112,7 @@ const AI_SYSTEM = {
     if (input.match(/(project|ayojana|nirman|technical|prabidhik|आयोजना|निर्माण|प्राविधिक)/)) {
         const total = (state.projects || []).length;
         const active = (state.projects || []).filter(p => p.status === 'active').length;
-        return `प्राविधिक परीक्षण महाशाखा अन्तर्गत <strong>${total}</strong> वटा आयोजना दर्ता छन्।<br>जसमध्ये <strong>${active}</strong> वटा सक्रिय (Active) छन्।`;
+        return `प्राविधिक परीक्षण महाशाखा अन्तर्गत <strong>${total}</strong> वटा आयोजना अनुगमन प्राविधिक/परीक्षण दर्ता छन्।<br>जसमध्ये <strong>${active}</strong> वटा चालु (Active) छन्।`;
     }
     
     // 6. तथ्याङ्क - कर्मचारी अनुगमन (Employee Monitoring)
@@ -2363,7 +2363,7 @@ function formatComplaintFromSheet(sheetData) {
       createdAt: String(getValue('createdAt', 'सिर्जना मिति', 'entryDate', 'Entry Date')),
       updatedBy: String(getValue('updatedBy', 'अपडेट गर्ने')),
       updatedAt: String(getValue('updatedAt', 'अपडेट मिति')),
-      syncedToSheets: true
+      syncedToSheets: true,
       province: String(getValue('province', 'प्रदेश')),
       district: String(getValue('district', 'जिल्ला')),
       location: String(getValue('location', 'स्थानीय तह')),
@@ -2627,7 +2627,12 @@ async function saveNewComplaint() {
     entryDate: new Date().toISOString().slice(0, 10),
     'Entry Date': new Date().toISOString().slice(0, 10),
     'Branch': shakhaName || shakhaToSave, // Main key for sheet
-    'Entry Branch': shakhaName || shakhaToSave
+    
+    'Entry Branch': shakhaName || shakhaToSave,
+    province: document.getElementById('complaintProvince')?.value || '',
+    district: document.getElementById('complaintDistrict')?.value || '',
+    location: document.getElementById('complaintLocation')?.value || '',
+    ward: document.getElementById('complaintWard')?.value || ''
   };
   
   console.log('📦 Complaint data prepared:', Object.keys(complaintData).join(', '));
@@ -5328,7 +5333,7 @@ function showComplaintsView(initialFilters = {}) {
           <div class="filter-grid">
             <!-- Group 1: Date Range -->
             <div class="filter-group-box">
-                <label class="filter-group-label">मिति दायरा</label>
+                <label class="filter-group-label">मितिको दायरा (Range)</label>
                 <div class="d-flex flex-wrap gap-2 align-center">
                     <div class="nepali-datepicker-dropdown" data-target="filterStartDate">
                         <select id="filterStartDate_year" class="form-select form-select-sm bs-year"><option value="">साल</option></select>
@@ -6173,7 +6178,7 @@ function showNewProjectModal() {
             <input type="hidden" id="projectImprovementLetterDate" />
           </div>
         </div>
-        <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="projectStatus"><option value="pending">काम बाँकी</option><option value="active">सक्रिय</option><option value="completed">सम्पन्न</option></select></div>
+        <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="projectStatus"><option value="pending">काम बाँकी</option><option value="active">चालु</option><option value="completed">सम्पन्न</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">अपरिपालना सुधारको जानकारी</label><textarea class="form-control" rows="2" id="projectImprovementInfo" placeholder="अपरिपालना सुधारको जानकारी"></textarea></div>
       <div class="form-group"><label class="form-label">कैफियत</label><textarea class="form-control" rows="2" id="projectRemarks" placeholder="कैफियत"></textarea></div>
@@ -6240,7 +6245,7 @@ function editProject(id) {
             <input type="hidden" id="editProjectImprovementLetterDate" value="${project.improvementLetterDate || ''}" />
           </div>
         </div>
-        <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="editProjectStatus"><option value="pending" ${project.status === 'pending' ? 'selected' : ''}>काम बाँकी</option><option value="active" ${project.status === 'active' ? 'selected' : ''}>सक्रिय</option><option value="completed" ${project.status === 'completed' ? 'selected' : ''}>सम्पन्न</option></select></div>
+        <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="editProjectStatus"><option value="pending" ${project.status === 'pending' ? 'selected' : ''}>काम बाँकी</option><option value="active" ${project.status === 'active' ? 'selected' : ''}>चालु</option><option value="completed" ${project.status === 'completed' ? 'selected' : ''}>सम्पन्न</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">अपरिपालना सुधारको जानकारी</label><textarea class="form-control" rows="2" id="editProjectImprovementInfo">${project.improvementInfo || ''}</textarea></div>
       <div class="form-group"><label class="form-label">कैफियत</label><textarea class="form-control" rows="2" id="editProjectRemarks">${project.remarks || ''}</textarea></div>
@@ -8115,3 +8120,140 @@ window.showDashboardPage = function() {
   if (originalShowDashboardPage) originalShowDashboardPage.apply(this, arguments);
   setTimeout(addGoogleSheetsButtons, 500);
 };
+
+// ==================== MAP & LOCATION SERVICES ====================
+const DISTRICT_COORDINATES = {
+    'काठमाडौं': [27.7172, 85.3240],
+    'ललितपुर': [27.6667, 85.3333],
+    'भक्तपुर': [27.6710, 85.4298],
+    'चितवन': [27.5291, 84.3636],
+    'कास्की': [28.2096, 83.9856],
+    'मोरङ': [26.6525, 87.3718],
+    'सुनसरी': [26.65, 87.15],
+    'झापा': [26.60, 87.90],
+    'रुपन्देही': [27.5017, 83.4533],
+    'बाँके': [28.0500, 81.6167],
+    'धनुषा': [26.7288, 85.9274],
+    'पर्सा': [27.0130, 84.8770],
+    'कैलाली': [28.6852, 80.6133],
+    'सुर्खेत': [28.6019, 81.6339],
+    'मकवानपुर': [27.4167, 85.0333],
+    'दाङ': [28.00, 82.30],
+    'सिन्धुपाल्चोक': [27.80, 85.70],
+    'काभ्रेपलाञ्चोक': [27.60, 85.55],
+    'नुवाकोट': [27.90, 85.15],
+    'धादिङ': [27.90, 84.90],
+    'इलाम': [26.90, 87.90],
+    'कञ्चनपुर': [28.80, 80.20],
+    'बर्दिया': [28.20, 81.30],
+    'कपिलवस्तु': [27.55, 83.05],
+    'नवलपरासी (बर्दघाट सुस्ता पश्चिम)': [27.53, 83.67],
+    'नवलपुर': [27.60, 84.10],
+    'तनहुँ': [27.90, 84.20],
+    'स्याङ्जा': [28.00, 83.80],
+    'पाल्पा': [27.85, 83.55],
+    'गुल्मी': [28.05, 83.25],
+    'अर्घाखाँची': [27.90, 83.10],
+    'प्युठान': [28.10, 82.85],
+    'रोल्पा': [28.35, 82.60],
+    'रुकुम': [28.60, 82.50],
+    'सल्यान': [28.35, 82.15],
+    'डोटी': [29.10, 80.95],
+    'अछाम': [29.10, 81.30],
+    'बाजुरा': [29.50, 81.50],
+    'बझाङ': [29.55, 81.20],
+    'दार्चुला': [29.85, 80.55],
+    'बैतडी': [29.50, 80.45],
+    'डडेल्धुरा': [29.30, 80.55]
+};
+
+function generateHotspotCards() {
+    const districtCounts = {};
+    (state.complaints || []).forEach(c => {
+        const dist = c.district || 'अन्य';
+        if (dist !== 'अन्य') {
+            districtCounts[dist] = (districtCounts[dist] || 0) + 1;
+        }
+    });
+
+    const sortedDistricts = Object.entries(districtCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
+    if (sortedDistricts.length === 0) {
+        return '<div class="text-muted text-small p-2">स्थान डाटा उपलब्ध छैन</div>';
+    }
+
+    return sortedDistricts.map(([dist, count]) => `
+        <div class="hotspot-card" style="min-width: 160px;" onclick="showHotspotMap('${dist}')">
+            <div class="d-flex justify-between align-center mb-1">
+                <span class="font-weight-bold text-primary text-small">${dist}</span>
+                <span class="badge badge-danger">${count}</span>
+            </div>
+            <div class="progress" style="height: 4px; background-color: #e9ecef; border-radius: 2px;">
+                <div class="progress-bar" style="width: ${Math.min(100, count * 10)}%; border-radius: 2px;"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showHotspotMap(focusDistrict = null) {
+    state.currentView = 'hotspot_map';
+    document.getElementById('pageTitle').textContent = 'हटस्पट नक्सा';
+    
+    const content = `
+        <div class="card h-100">
+            <div class="card-header d-flex justify-between align-center">
+                <h5 class="mb-0">उजुरीको भौगोलिक वितरण</h5>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="mapFilterProvince" onchange="updateMapFilter()">
+                        <option value="">सबै प्रदेश</option>
+                        ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([k, v]) => `<option value="${v}">${v}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="card-body p-0" style="position: relative;">
+                <div id="hotspotMap" style="height: 600px; width: 100%; background: #f8f9fa;"></div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('contentArea').innerHTML = content;
+    updateActiveNavItem();
+
+    setTimeout(() => {
+        if (typeof L === 'undefined') {
+            document.getElementById('hotspotMap').innerHTML = '<div class="p-5 text-center text-danger">नक्सा लोड गर्न सकिएन (Leaflet JS missing)</div>';
+            return;
+        }
+        if (window.nvcMap) { window.nvcMap.remove(); window.nvcMap = null; }
+        const map = L.map('hotspotMap').setView([28.3949, 84.1240], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+        const districtCounts = {};
+        (state.complaints || []).forEach(c => { const dist = c.district; if (dist) districtCounts[dist] = (districtCounts[dist] || 0) + 1; });
+        Object.entries(districtCounts).forEach(([dist, count]) => {
+            const coords = DISTRICT_COORDINATES[dist];
+            if (coords) {
+                const radius = Math.min(30, 8 + count * 1.5);
+                const color = count > 10 ? '#d32f2f' : count > 5 ? '#ff9800' : '#1976d2';
+                L.circleMarker(coords, { radius: radius, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.7 }).addTo(map).bindPopup(`<strong>${dist}</strong><br>उजुरी संख्या: ${count}`);
+            }
+        });
+        if (focusDistrict && DISTRICT_COORDINATES[focusDistrict]) { map.setView(DISTRICT_COORDINATES[focusDistrict], 10); }
+        window.nvcMap = map;
+    }, 300);
+}
+
+function updateMapFilter() { showToast('फिल्टर अपडेट गरियो', 'info'); }
+function monitorHotspotAlerts() { /* Alert logic */ }
+function loadDistricts() {
+    const provinceSelect = document.getElementById('complaintProvince');
+    const districtSelect = document.getElementById('complaintDistrict');
+    if (!provinceSelect || !districtSelect) return;
+    const provinceId = provinceSelect.value;
+    districtSelect.innerHTML = '<option value="">जिल्ला छान्नुहोस्</option>';
+    if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
+        LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => { const option = document.createElement('option'); option.value = dist; option.textContent = dist; districtSelect.appendChild(option); });
+        districtSelect.disabled = false;
+    } else { districtSelect.disabled = true; }
+}
