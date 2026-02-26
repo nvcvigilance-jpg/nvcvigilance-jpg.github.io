@@ -19,34 +19,54 @@ const AI_SYSTEM = {
   keywords: {
     high: ['तुरुन्त', 'अति', 'गम्भीर', 'भ्रष्टाचार', 'घूस', 'ज्यान', 'जोखिम', 'urgent', 'corruption', 'करोड'],
     medium: ['समस्या', 'ढिला', 'अनियमितता', 'गुनासो', 'delay', 'लापरवाही'],
+    // New Classification Keywords
+    corruption: ['भ्रष्टाचार', 'घूस', 'रकम', 'लेनदेन', 'घुस', 'corruption', 'bribe', 'commission', 'कमिशन'],
+    procurement: ['ठेक्का', 'खरिद', 'टेन्डर', 'बोलपत्र', 'procurement', 'contract', 'tender', 'bidding'],
+    financial: ['हिनामिना', 'अनियमितता', 'बजेट', 'दुरुपयोग', 'नक्कली बिल', 'embezzlement', 'financial', 'audit', 'बेरुजु', 'आर्थिक'],
+    infrastructure: ['बाटो', 'पुल', 'भवन', 'निर्माण', 'गुणस्तर', 'इन्जिनियर', 'सिमेन्ट', 'डण्डी', 'infrastructure', 'construction', 'road'],
+    service: ['सेवा', 'ढिलासुस्ती', 'सास्ती', 'काम भएन', 'service', 'delay', 'hassle', 'नागरिक बडापत्र'],
+    conduct: ['आचरण', 'व्यवहार', 'गालीगलौज', 'मादक', 'पदार्थ', 'conduct', 'behavior', 'staff', 'कर्मचारी', 'हाजिरी', 'बिदा'],
+    policy: ['निर्णय', 'प्रक्रिया', 'विधि', 'नियुक्ति', 'नियुक्त', 'नियम', 'विपरीत', 'मापदण्ड', 'policy', 'decision', 'rule', 'law', 'ऐन', 'नियम'],
+    // Old Keywords (kept for backward compatibility)
     technical: ['बाटो', 'पुल', 'भवन', 'निर्माण', 'गुणस्तर', 'इन्जिनियर', 'ठेक्का', 'construction', 'road', 'सिमेन्ट', 'डण्डी'],
     admin: ['कर्मचारी', 'हाजिरी', 'बिदा', 'सरुवा', 'बढुवा', 'प्रशासन', 'staff', 'leave', 'पोशाक'],
     police: ['प्रहरी', 'सुरक्षा', 'अपराध', 'police', 'security', 'चोरी']
   },
 
   analyzeComplaint: function(description) {
-    if (!description) return { priority: 'साधारण', category: 'अन्य', summary: '' };
+    if (!description) return { priority: 'साधारण', category: 'अन्य', classification: 'अन्य', summary: '' };
     
     let priority = 'साधारण';
     let category = 'अन्य';
+    let classification = 'अन्य';
+    const text = description.toLowerCase();
     
     // Priority Detection
-    if (this.keywords.high.some(k => description.includes(k))) {
+    if (this.keywords.high.some(k => text.includes(k))) {
       priority = 'उच्च';
-    } else if (this.keywords.medium.some(k => description.includes(k))) {
+    } else if (this.keywords.medium.some(k => text.includes(k))) {
       priority = 'मध्यम';
     }
 
+    // Classification Detection (New)
+    if (this.keywords.corruption.some(k => text.includes(k))) classification = 'भ्रष्टाचार';
+    else if (this.keywords.procurement.some(k => text.includes(k))) classification = 'सार्वजनिक खरिद/ठेक्का';
+    else if (this.keywords.financial.some(k => text.includes(k))) classification = 'आर्थिक हिनामिना';
+    else if (this.keywords.infrastructure.some(k => text.includes(k))) classification = 'पूर्वाधार निर्माण';
+    else if (this.keywords.service.some(k => text.includes(k))) classification = 'सेवा प्रवाह';
+    else if (this.keywords.conduct.some(k => text.includes(k))) classification = 'कर्मचारी आचरण';
+    else if (this.keywords.policy.some(k => text.includes(k))) classification = 'नीति/निर्णय प्रक्रिया';
+
     // Category Detection
-    if (this.keywords.technical.some(k => description.includes(k))) category = 'प्राविधिक';
-    else if (this.keywords.admin.some(k => description.includes(k))) category = 'प्रशासन';
-    else if (this.keywords.police.some(k => description.includes(k))) category = 'प्रहरी';
+    if (this.keywords.technical.some(k => text.includes(k))) category = 'प्राविधिक';
+    else if (this.keywords.admin.some(k => text.includes(k))) category = 'प्रशासन';
+    else if (this.keywords.police.some(k => text.includes(k))) category = 'प्रहरी';
 
     // Summary Generation (Simple extraction of first sentence or first 100 chars)
     const sentences = description.split(/[।?!]/);
     const summary = sentences[0] + (sentences.length > 1 ? '...' : '');
 
-    return { priority, category, summary };
+    return { priority, category, classification, summary };
   },
 
   getChatResponse: function(input) {
@@ -982,7 +1002,6 @@ function ensureBSDate(raw) {
   return s;
 }
 
-// ==================== DATE PICKER FUNCTIONS (सुधारिएको) ====================
 // ==================== DATE PICKER FUNCTIONS (सुधारिएको) ====================
 async function initializeDatepickers() {
     console.log('📅 Initializing datepickers...');
@@ -2631,8 +2650,7 @@ async function saveNewComplaint() {
     'Entry Branch': shakhaName || shakhaToSave,
     province: document.getElementById('complaintProvince')?.value || '',
     district: document.getElementById('complaintDistrict')?.value || '',
-    location: document.getElementById('complaintLocation')?.value || '',
-    ward: document.getElementById('complaintWard')?.value || ''
+    location: document.getElementById('complaintLocation')?.value || ''
   };
   
   console.log('📦 Complaint data prepared:', Object.keys(complaintData).join(', '));
@@ -4041,7 +4059,7 @@ function initializeDashboardCharts() {
 
       try {
         window.nvcCharts.complaintStatus = new Chart(statusCanvas.getContext('2d'), {
-          type: window.nvcChartsType.complaintStatus || 'doughnut',
+          type: window.nvcChartsType['complaintStatusChart'] || window.nvcChartsType.complaintStatus || 'doughnut',
           data: window.nvcChartsData.complaintStatus,
           options: {
             responsive: true, maintainAspectRatio: false,
@@ -4230,8 +4248,8 @@ function initializeDashboardCharts() {
                 if (elements.length > 0) {
                     const i = elements[0].index;
                     const monthName = chart.data.labels[i];
-                    // Simple filter by month string match in date
-                    showChartDrillDown({ month: monthName }, `${monthName} महिनाका उजुरीहरू`);
+                    // Pass monthIndex (1-based) for accurate filtering
+                    showChartDrillDown({ monthIndex: i + 1, monthName: monthName }, `${monthName} महिनाका उजुरीहरू`);
                 }
             },
             scales: { 
@@ -4453,6 +4471,78 @@ function initializeDashboardCharts() {
         });
       } catch (e) { console.error('❌ Error creating resolution rate chart:', e); }
     }
+
+    // --- New Classification Chart ---
+    const classificationCtx = document.getElementById('classificationChart');
+    if (classificationCtx) {
+      if (window.nvcCharts.classificationChart) window.nvcCharts.classificationChart.destroy();
+
+      const classStats = {
+        'भ्रष्टाचार': 0,
+        'सार्वजनिक खरिद/ठेक्का': 0,
+        'आर्थिक हिनामिना': 0,
+        'पूर्वाधार निर्माण': 0,
+        'सेवा प्रवाह': 0,
+        'कर्मचारी आचरण': 0,
+        'नीति/निर्णय प्रक्रिया': 0,
+        'अन्य': 0
+      };
+
+      // Filter complaints based on role (same logic as other charts)
+      let chartComplaints = state.complaints || [];
+      if (state.currentUser && state.currentUser.role === 'shakha') {
+        const userShakhaName = (state.currentUser.shakha || '').trim();
+        const userCode = (state.currentUser.id || '').trim();
+        chartComplaints = chartComplaints.filter(c => {
+          const cShakha = (c.shakha || '').trim();
+          return cShakha === userShakhaName || 
+                 cShakha.toLowerCase() === userCode.toLowerCase() ||
+                 SHAKHA[cShakha] === userShakhaName ||
+                 SHAKHA[cShakha.toUpperCase()] === userShakhaName;
+        });
+      } else if (state.currentUser && state.currentUser.role === 'mahashakha') {
+        chartComplaints = chartComplaints.filter(c => c.mahashakha === state.currentUser.mahashakha || c.mahashakha === state.currentUser.name);
+        const mahashakhaFilter = document.getElementById('mahashakhaFilterShakha');
+        if (mahashakhaFilter && mahashakhaFilter.value) {
+            chartComplaints = chartComplaints.filter(c => c.shakha === mahashakhaFilter.value);
+        }
+      }
+
+      chartComplaints.forEach(c => {
+          const analysis = AI_SYSTEM.analyzeComplaint(c.description || '');
+          const cls = analysis.classification || 'अन्य';
+          if (classStats[cls] !== undefined) classStats[cls]++;
+          else classStats['अन्य']++;
+      });
+
+      window.nvcChartsData.classificationChart = {
+          labels: Object.keys(classStats),
+          datasets: [{
+              label: 'उजुरी संख्या',
+              data: Object.values(classStats),
+              backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#535353'],
+              borderWidth: 1
+          }]
+      };
+
+      try {
+        window.nvcCharts.classificationChart = new Chart(classificationCtx.getContext('2d'), {
+          type: window.nvcChartsType['classificationChart'] || window.nvcChartsType.classificationChart || 'doughnut',
+          data: window.nvcChartsData.classificationChart,
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            onClick: (evt, elements, chart) => {
+                if (elements.length > 0) {
+                    const i = elements[0].index;
+                    const label = chart.data.labels[i];
+                    showChartDrillDown({ classification: label }, `${label} सम्बन्धी उजुरीहरू`);
+                }
+            },
+            plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } }
+          }
+        });
+      } catch (e) { console.error('❌ Error creating classification chart:', e); }
+    }
   }, 300);
 }
 
@@ -4461,7 +4551,25 @@ function showChartDrillDown(filters, title) {
     
     if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
     if (filters.shakha) filtered = filtered.filter(c => c.shakha === filters.shakha);
-    if (filters.month) filtered = filtered.filter(c => (c.date || '').includes(filters.month));
+    
+    if (filters.monthIndex) {
+        filtered = filtered.filter(c => {
+            if (!c.date) return false;
+            const parts = c.date.split('-');
+            if (parts.length >= 2) return parseInt(parts[1]) === filters.monthIndex;
+            return false;
+        });
+    } else if (filters.month) {
+        filtered = filtered.filter(c => (c.date || '').includes(filters.month));
+    }
+
+    if (filters.classification) {
+        filtered = filtered.filter(c => {
+            const analysis = AI_SYSTEM.analyzeComplaint(c.description || '');
+            const cls = analysis.classification || 'अन्य';
+            return cls === filters.classification;
+        });
+    }
     
     const tableRows = filtered.map(c => `
         <tr>
@@ -4598,6 +4706,35 @@ function getChartActionsHTML(chartId) {
   `;
 }
 
+function generateClassificationTableHTML(complaints) {
+    const stats = {
+        'भ्रष्टाचार': 0, 'सार्वजनिक खरिद/ठेक्का': 0, 'आर्थिक हिनामिना': 0, 'पूर्वाधार निर्माण': 0,
+        'सेवा प्रवाह': 0, 'कर्मचारी आचरण': 0, 'नीति/निर्णय प्रक्रिया': 0, 'अन्य': 0
+    };
+
+    complaints.forEach(c => {
+        const analysis = AI_SYSTEM.analyzeComplaint(c.description || '');
+        const cls = analysis.classification || 'अन्य';
+        if (stats[cls] !== undefined) stats[cls]++;
+        else stats['अन्य'] = (stats['अन्य'] || 0) + 1;
+    });
+
+    const rows = Object.entries(stats).map(([key, value]) => `
+        <tr><td>${key}</td><td class="text-end">${value}</td></tr>
+    `).join('');
+
+    return `
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                    <tr><th>वर्गीकरण (विषय)</th><th class="text-end">संख्या</th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
 function showAdminDashboard() {
   const totalComplaints = state.complaints.length;
   const pendingComplaints = state.complaints.filter(c => c.status === 'pending').length;
@@ -4649,6 +4786,13 @@ function showAdminDashboard() {
       <div class="stat-widget pointer" onclick="showComplaintsView()"><div class="stat-icon bg-secondary"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${monthlyComplaints}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-between align-center"><h5 class="mb-0">उजुरी वर्गीकरण (AI विश्लेषण)</h5>${getChartActionsHTML('classificationChart')}</div>
+      <div class="card-body">
+        <div class="row"><div class="col-md-7"><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="classificationChart"></canvas></div></div><div class="col-md-5">${generateClassificationTableHTML(state.complaints)}</div></div>
+      </div>
+    </div>
+
     <div class="d-grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">शाखा अनुसार उजुरी तुलना</h6>${getChartActionsHTML('shakhaChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="shakhaChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मासिक प्रगति विवरण</h6>${getChartActionsHTML('trendChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="trendChart"></canvas></div></div>
@@ -4803,6 +4947,13 @@ function showMahashakhaDashboard() {
       <div class="stat-widget pointer" onclick="showComplaintsView()"><div class="stat-icon bg-secondary"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${monthlyComplaints}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-between align-center"><h5 class="mb-0">उजुरी वर्गीकरण (AI विश्लेषण)</h5>${getChartActionsHTML('classificationChart')}</div>
+      <div class="card-body">
+        <div class="row"><div class="col-md-7"><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="classificationChart"></canvas></div></div><div class="col-md-5">${generateClassificationTableHTML(mahashakhaComplaints)}</div></div>
+      </div>
+    </div>
+
     <div class="d-grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">शाखा अनुसार तुलना</h6>${getChartActionsHTML('shakhaComparisonChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="shakhaComparisonChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मासिक प्रगति विवरण</h6>${getChartActionsHTML('trendChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="trendChart"></canvas></div></div>
@@ -4971,6 +5122,13 @@ function showTechnicalDashboard() {
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView({status: 'active'})"><div class="stat-icon bg-secondary"><i class="fas fa-tasks"></i></div><div class="stat-info"><div class="stat-value">${activeProjects}</div><div class="stat-label">चालु आयोजना</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-between align-center"><h5 class="mb-0">उजुरी वर्गीकरण (AI विश्लेषण)</h5>${getChartActionsHTML('classificationChart')}</div>
+      <div class="card-body">
+        <div class="row"><div class="col-md-7"><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="classificationChart"></canvas></div></div><div class="col-md-5">${generateClassificationTableHTML(shakhaComplaints)}</div></div>
+      </div>
+    </div>
+
     <div class="d-grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <div class="card"><div class="card-header d-flex justify-between align-center"><h6 class="mb-0">उजुरी स्थिति</h6>${getChartActionsHTML('complaintStatusChart')}</div><div class="card-body"><canvas id="complaintStatusChart"></canvas></div></div>
       <div class="card"><div class="card-header d-flex justify-between align-center"><h6 class="mb-0">प्राविधिक परीक्षण/आयोजना अनुगमन</h6>${getChartActionsHTML('projectStatusChart')}</div><div class="card-body"><canvas id="projectStatusChart"></canvas></div></div>
@@ -5057,6 +5215,13 @@ function showShakhaDashboard() {
       <div class="stat-widget pointer" onclick="showComplaintsView()"><div class="stat-icon bg-secondary"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${monthlyComplaints}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-between align-center"><h5 class="mb-0">उजुरी वर्गीकरण (AI विश्लेषण)</h5>${getChartActionsHTML('classificationChart')}</div>
+      <div class="card-body">
+        <div class="row"><div class="col-md-7"><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="classificationChart"></canvas></div></div><div class="col-md-5">${generateClassificationTableHTML(shakhaComplaints)}</div></div>
+      </div>
+    </div>
+
     <div class="d-grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">उजुरी स्थिति</h6>${getChartActionsHTML('complaintStatusChart')}</div><div class="chart-wrapper"><canvas id="complaintStatusChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मासिक प्रगति विवरण</h6>${getChartActionsHTML('trendChart')}</div><div class="chart-wrapper"><canvas id="trendChart"></canvas></div></div>
@@ -5744,10 +5909,6 @@ function showNewComplaintView() {
                 <label class="form-label">स्थानीय तह / नगर</label>
                 <input type="text" class="form-control" id="complaintLocation" placeholder="जस्तै: काठमाडौं महानगरपालिका">
               </div>
-              <div class="form-group">
-                <label class="form-label">टोल / वडा नं.</label>
-                <input type="text" class="form-control" id="complaintWard" placeholder="वडा नं.">
-              </div>
             </div>
           </div>
 
@@ -5843,6 +6004,7 @@ function showNewComplaintView() {
                     aiSuggContent.classList.remove('hidden');
                     document.getElementById('aiCategoryText').innerHTML = `श्रेणी: <span class="badge badge-secondary">${analysis.category}</span>`;
                     document.getElementById('aiPriorityText').innerHTML = `प्राथमिकता: <span class="badge ${analysis.priority === 'उच्च' ? 'badge-danger' : analysis.priority === 'मध्यम' ? 'badge-warning' : 'badge-success'}">${analysis.priority}</span>`;
+                    document.getElementById('aiCategoryText').innerHTML += ` <br>वर्गीकरण: <span class="badge badge-info">${analysis.classification}</span>`;
                     
                     // Auto-categorization for decision
                     let decisionSugg = '';
@@ -5880,7 +6042,8 @@ function showNewComplaintView() {
                         keywords.forEach(k => {
                             if (c.description.includes(k)) matchCount++;
                         });
-                        return matchCount >= 2; // At least 2 keywords match
+                        // Relaxed logic: if we have few keywords, 1 match is enough.
+                        return matchCount >= (keywords.length < 3 ? 1 : 2);
                     }).slice(0, 3);
 
                     if (similar.length > 0) {
@@ -5895,6 +6058,8 @@ function showNewComplaintView() {
                     } else {
                         similarBox.classList.add('hidden');
                     }
+                } else {
+                    similarBox.classList.add('hidden');
                 }
             } else {
                 document.getElementById('aiSuggestionContent')?.classList.add('hidden');
@@ -7378,6 +7543,7 @@ function viewComplaint(id) {
         <div class="mb-2"><span class="ai-badge"><i class="fas fa-robot"></i> AI विश्लेषण</span></div>
         <div class="text-small"><strong>सारांश:</strong> ${aiAnalysis.summary}</div>
         <div class="d-flex gap-3 mt-2 text-small"><span><strong>प्राथमिकता:</strong> ${aiAnalysis.priority}</span><span><strong>श्रेणी:</strong> ${aiAnalysis.category}</span></div>
+        <div class="text-small mt-1"><strong>वर्गीकरण:</strong> ${aiAnalysis.classification}</div>
       </div>
 
       <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
@@ -8123,48 +8289,90 @@ window.showDashboardPage = function() {
 
 // ==================== MAP & LOCATION SERVICES ====================
 const DISTRICT_COORDINATES = {
-    'काठमाडौं': [27.7172, 85.3240],
-    'ललितपुर': [27.6667, 85.3333],
-    'भक्तपुर': [27.6710, 85.4298],
-    'चितवन': [27.5291, 84.3636],
-    'कास्की': [28.2096, 83.9856],
+    // Province 1
+    'ताप्लेजुङ': [27.35, 87.6667],
+    'पाँचथर': [27.1736, 87.8133],
+    'इलाम': [26.9131, 87.9225],
+    'झापा': [26.6219, 87.9919],
     'मोरङ': [26.6525, 87.3718],
-    'सुनसरी': [26.65, 87.15],
-    'झापा': [26.60, 87.90],
-    'रुपन्देही': [27.5017, 83.4533],
-    'बाँके': [28.0500, 81.6167],
+    'सुनसरी': [26.6269, 87.1511],
+    'धनकुटा': [26.9808, 87.3433],
+    'तेह्रथुम': [27.1911, 87.5519],
+    'संखुवासभा': [27.3714, 87.1436],
+    'भोजपुर': [27.1736, 87.0458],
+    'सोलुखुम्बु': [27.5, 86.5833],
+    'ओखलढुंगा': [27.3167, 86.5],
+    'खोटाङ': [27.2167, 86.7667],
+    'उदयपुर': [26.9131, 86.6333],
+    // Province 2 (Madhesh)
+    'सप्तरी': [26.5333, 86.75],
+    'सिराहा': [26.65, 86.2],
     'धनुषा': [26.7288, 85.9274],
+    'महोत्तरी': [26.65, 85.8],
+    'सर्लाही': [26.85, 85.5667],
+    'रौतहट': [26.9167, 85.2667],
+    'बारा': [27.0, 85.1167],
     'पर्सा': [27.0130, 84.8770],
-    'कैलाली': [28.6852, 80.6133],
-    'सुर्खेत': [28.6019, 81.6339],
-    'मकवानपुर': [27.4167, 85.0333],
-    'दाङ': [28.00, 82.30],
+    // Province 3 (Bagmati)
+    'सिन्धुली': [27.25, 85.9667],
+    'रामेछाप': [27.3333, 86.0833],
+    'दोलखा': [27.65, 86.05],
     'सिन्धुपाल्चोक': [27.80, 85.70],
     'काभ्रेपलाञ्चोक': [27.60, 85.55],
+    'ललितपुर': [27.6667, 85.3333],
+    'भक्तपुर': [27.6710, 85.4298],
+    'काठमाडौं': [27.7172, 85.3240],
     'नुवाकोट': [27.90, 85.15],
+    'रसुवा': [28.1167, 85.2833],
     'धादिङ': [27.90, 84.90],
-    'इलाम': [26.90, 87.90],
-    'कञ्चनपुर': [28.80, 80.20],
-    'बर्दिया': [28.20, 81.30],
-    'कपिलवस्तु': [27.55, 83.05],
-    'नवलपरासी (बर्दघाट सुस्ता पश्चिम)': [27.53, 83.67],
-    'नवलपुर': [27.60, 84.10],
+    'चितवन': [27.5291, 84.3636],
+    'मकवानपुर': [27.4167, 85.0333],
+    // Province 4 (Gandaki)
+    'गोरखा': [28.0, 84.6333],
+    'लमजुङ': [28.2333, 84.3667],
     'तनहुँ': [27.90, 84.20],
+    'कास्की': [28.2096, 83.9856],
+    'मनाङ': [28.6667, 84.25],
+    'मुस्ताङ': [28.7833, 83.9833],
+    'पर्वत': [28.2167, 83.7167],
     'स्याङ्जा': [28.00, 83.80],
+    'म्याग्दी': [28.35, 83.5667],
+    'बाग्लुङ': [28.2667, 83.6],
+    'नवलपुर': [27.60, 84.10], // Part of former Nawalparasi
+    // Province 5 (Lumbini)
+    'नवलपरासी (बर्दघाट सुस्ता पश्चिम)': [27.53, 83.67], // Part of former Nawalparasi
+    'रुपन्देही': [27.5017, 83.4533],
+    'कपिलवस्तु': [27.55, 83.05],
     'पाल्पा': [27.85, 83.55],
-    'गुल्मी': [28.05, 83.25],
     'अर्घाखाँची': [27.90, 83.10],
-    'प्युठान': [28.10, 82.85],
+    'गुल्मी': [28.05, 83.25],
     'रोल्पा': [28.35, 82.60],
-    'रुकुम': [28.60, 82.50],
+    'प्युठान': [28.10, 82.85],
+    'दाङ': [28.00, 82.30],
+    'बाँके': [28.0500, 81.6167],
+    'बर्दिया': [28.20, 81.30],
+    'पूर्वी रुकुम': [28.64, 82.84], // Rukum East
+    // Province 6 (Karnali)
+    'पश्चिम रुकुम': [28.63, 82.45], // Rukum West
     'सल्यान': [28.35, 82.15],
-    'डोटी': [29.10, 80.95],
-    'अछाम': [29.10, 81.30],
+    'सुर्खेत': [28.6019, 81.6339],
+    'दैलेख': [28.85, 81.7],
+    'जाजरकोट': [28.7167, 82.1833],
+    'डोल्पा': [28.9667, 82.8167],
+    'हुम्ला': [29.9667, 81.8333],
+    'जुम्ला': [29.2833, 82.1833],
+    'कालिकोट': [29.1667, 81.5833],
+    'मुगु': [29.5333, 82.15],
+    // Province 7 (Sudurpashchim)
     'बाजुरा': [29.50, 81.50],
     'बझाङ': [29.55, 81.20],
+    'डोटी': [29.10, 80.95],
+    'अछाम': [29.10, 81.30],
     'दार्चुला': [29.85, 80.55],
     'बैतडी': [29.50, 80.45],
-    'डडेल्धुरा': [29.30, 80.55]
+    'डडेल्धुरा': [29.30, 80.55],
+    'कञ्चनपुर': [28.80, 80.20],
+    'कैलाली': [28.6852, 80.6133]
 };
 
 function generateHotspotCards() {
@@ -8236,7 +8444,33 @@ function showHotspotMap(focusDistrict = null) {
             if (coords) {
                 const radius = Math.min(30, 8 + count * 1.5);
                 const color = count > 10 ? '#d32f2f' : count > 5 ? '#ff9800' : '#1976d2';
-                L.circleMarker(coords, { radius: radius, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.7 }).addTo(map).bindPopup(`<strong>${dist}</strong><br>उजुरी संख्या: ${count}`);
+                const marker = L.circleMarker(coords, { radius: radius, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.7 }).addTo(map);
+                
+                // Hover behavior (Tooltip)
+                marker.bindTooltip(`<strong>${dist}</strong><br>उजुरी संख्या: ${count}`, { direction: 'top' });
+                
+                // Click behavior (Show list)
+                marker.on('click', () => {
+                     const districtComplaints = (state.complaints || []).filter(c => c.district === dist);
+                     let content = `<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>दर्ता नं</th><th>मिति</th><th>विवरण</th><th>स्थिति</th></tr></thead><tbody>`;
+                     
+                     if(districtComplaints.length === 0) {
+                         content += `<tr><td colspan="4" class="text-center">उजुरी छैन</td></tr>`;
+                     } else {
+                         districtComplaints.forEach(c => {
+                             const statusText = c.status === 'resolved' ? 'फछ्रयौट' : c.status === 'progress' ? 'चालु' : 'बाँकी';
+                             const statusClass = c.status === 'resolved' ? 'text-success' : c.status === 'progress' ? 'text-primary' : 'text-warning';
+                             content += `<tr>
+                                <td>${c.id}</td>
+                                <td>${c.date}</td>
+                                <td>${(c.description || '').substring(0, 40)}...</td>
+                                <td class="${statusClass}">${statusText}</td>
+                             </tr>`;
+                         });
+                     }
+                     content += `</tbody></table></div>`;
+                     openModal(`${dist} जिल्लाका उजुरीहरू`, content);
+                });
             }
         });
         if (focusDistrict && DISTRICT_COORDINATES[focusDistrict]) { map.setView(DISTRICT_COORDINATES[focusDistrict], 10); }
