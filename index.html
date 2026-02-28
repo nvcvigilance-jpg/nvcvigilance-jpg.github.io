@@ -9,16 +9,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Preahvihear&display=swap" rel="stylesheet">
     <!-- Bootstrap CSS (Optional) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Nepali DatePicker CSS (LeafyCode) - सही नेपाली मितिको लागि (v5.1.0) -->
-    <!-- Nepali DatePicker CSS (LeafyCode v5.1.0) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nepali-date-picker@5.1.0/dist/nepali.datepicker.v5.1.0.min.css">
-<!-- External Libraries -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-<!-- Add fallback CSS for Nepali DatePicker - यो नयाँ थप्ने -->
-<link rel="stylesheet" href="https://nepalidatepicker.sajanmaharjan.com.np/nepali.datepicker/css/nepali.datepicker.v4.0.1.min.css">
-<!-- Your custom styles -->
-<link rel="stylesheet" href="style.css">
+    <!-- Nepali DatePicker CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.css">
+    <!-- External Libraries -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Your custom styles -->
+    <link rel="stylesheet" href="style.css">
     <style>
         /* Dark Mode Variables */
         body.dark-mode {
@@ -146,6 +143,27 @@
         }
     </style>
     <!-- Favicon -->
+    <style>
+        .chatbot-toggler {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            width: 48px;
+            height: 48px;
+            background: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        }
+        .chatbot-toggler:active { cursor: grabbing; }
+    </style>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
 </head>
 <body>
@@ -432,7 +450,7 @@
     </div>
 
     <!-- AI Chatbot Widget -->
-    <div class="chatbot-toggler" onclick="toggleChatbot()">
+    <div id="chatbotToggler" class="chatbot-toggler" title="Drag to move — click to open">
         <i class="fas fa-robot"></i>
     </div>
     <div class="chatbot-window" id="chatbotWindow">
@@ -456,31 +474,28 @@
     </div>
 
     <!-- Scripts -->
-<!-- Scripts (सही क्रममा) -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Nepali DatePicker JS (v5.1.0) - मुख्य लाइब्रेरी -->
-<script src="https://cdn.jsdelivr.net/npm/nepali-date-picker@5.1.0/dist/nepali.datepicker.v5.1.0.min.js"></script>
-<!-- Add fallback Nepali DatePicker JS - यो नयाँ थप्ने -->
-<script src="https://nepalidatepicker.sajanmaharjan.com.np/nepali.datepicker/js/nepali.datepicker.v4.0.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script> 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Nepali DatePicker JS -->
+    <script src="https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script> 
 
-<!-- यो नयाँ थप्ने: Nepali DatePicker default language नेपाली सेट गर्न -->
-<script>
-    // Nepali DatePicker को लागि पूर्व-सेटिङ
-    if (typeof $.fn.nepaliDatePicker !== 'undefined') {
-        $(document).ready(function() {
-            $.fn.nepaliDatePicker.setDefaults({
-                language: 'nepali',
-                ndpYear: true,
-                ndpMonth: true,
-                ndpYearCount: 10
+    <!-- यो नयाँ थप्ने: Nepali DatePicker default language नेपाली सेट गर्न -->
+    <script>
+        // Nepali DatePicker को लागि पूर्व-सेटिङ
+        if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && typeof $.fn.nepaliDatePicker.setDefaults === 'function') {
+            $(document).ready(function() {
+                $.fn.nepaliDatePicker.setDefaults({
+                    language: 'nepali',
+                    ndpYear: true,
+                    ndpMonth: true,
+                    ndpYearCount: 10
+                });
             });
-        });
-    }
+        }
 </script>
 
 <script src="script.js"></script>
@@ -609,6 +624,95 @@
             });
         }
     });
+</script>
+
+<!-- Make chatbot toggler draggable (pointer events) and persist position -->
+<script>
+    (function(){
+        const key = 'chatbotTogglerPos';
+        const toggler = document.getElementById('chatbotToggler');
+        if (!toggler) return;
+
+        // Restore saved position if available
+        try {
+            const saved = JSON.parse(localStorage.getItem(key));
+            if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+                toggler.style.left = saved.left + 'px';
+                toggler.style.top = saved.top + 'px';
+                toggler.style.right = 'auto';
+                toggler.style.bottom = 'auto';
+            } else {
+                toggler.style.right = '20px';
+                toggler.style.bottom = '20px';
+            }
+        } catch (e) {
+            toggler.style.right = '20px';
+            toggler.style.bottom = '20px';
+        }
+
+        let dragging = false;
+        let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+        let moved = false;
+
+        function onPointerDown(e){
+            e.preventDefault();
+            dragging = true;
+            moved = false;
+            toggler.setPointerCapture && toggler.setPointerCapture(e.pointerId);
+            const rect = toggler.getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+            toggler.style.transition = 'none';
+        }
+
+        function onPointerMove(e){
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            const newLeft = Math.min(Math.max(8, startLeft + dx), window.innerWidth - toggler.offsetWidth - 8);
+            const newTop = Math.min(Math.max(8, startTop + dy), window.innerHeight - toggler.offsetHeight - 8);
+            toggler.style.left = newLeft + 'px';
+            toggler.style.top = newTop + 'px';
+            toggler.style.right = 'auto';
+            toggler.style.bottom = 'auto';
+            if (Math.hypot(dx, dy) > 4) moved = true;
+        }
+
+        function onPointerUp(e){
+            if (!dragging) return;
+            dragging = false;
+            try { toggler.releasePointerCapture && toggler.releasePointerCapture(e.pointerId); } catch (err) {}
+            toggler.style.transition = '';
+            // persist
+            const rect = toggler.getBoundingClientRect();
+            try {
+                localStorage.setItem(key, JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) }));
+            } catch (err) {}
+            // small delay before clearing moved so click isn't suppressed too long
+            setTimeout(() => { moved = false; }, 50);
+        }
+
+        toggler.addEventListener('pointerdown', onPointerDown);
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+
+        // Click handler — only trigger open when user didn't drag
+        toggler.addEventListener('click', function(e){
+            if (moved) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                return;
+            }
+            if (typeof toggleChatbot === 'function') {
+                toggleChatbot();
+            } else {
+                const win = document.getElementById('chatbotWindow');
+                if (win) win.classList.toggle('visible');
+            }
+        });
+    })();
 </script>
 
 </body>

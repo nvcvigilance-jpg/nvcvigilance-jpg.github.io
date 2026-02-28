@@ -368,6 +368,7 @@ const AI_SYSTEM = {
     // Default Response (Randomized)
     const defaults = [
         'माफ गर्नुहोला, मैले बुझिन। कृपया अलि स्पष्टसँग सोध्नुहोस्।',
+        'माफ गर्नुहोला, हाम्रो केन्द्रमा सनरुफ भएको गाडी छैन। सचिवज्यूको लागि एउटा फर्चुनर गाडी खोज्दै छौं।',
         'मैले प्रश्न बुझ्न सकिन। तपाईं "help" टाइप गरेर उदाहरण हेर्न सक्नुहुन्छ।',
         'क्षमा पाउँ, म अझै सिक्दै छु। तपाईंले उजुरी, आयोजना वा सम्पर्कबारे सोध्न सक्नुहुन्छ।',
         'तपाईंले के भन्न खोज्नुभएको हो? कृपया "कुल उजुरी", "सम्पर्क" वा उजुरी नम्बर लेख्नुहोस्।'
@@ -413,6 +414,15 @@ const AI_SYSTEM = {
     return 'COMPLAINT_MANAGEMENT';
   }
 };
+
+function normalizeProvinceName(value) {
+  if (value === undefined || value === null) return '';
+  const v = String(value).trim();
+  if (!v) return '';
+  const mapped = LOCATION_FIELDS?.PROVINCE?.[v] || LOCATION_FIELDS?.PROVINCE?.[Number(v)];
+  const name = mapped ? String(mapped) : v;
+  return name.replace(/\s*प्रदेश\s*$/g, '').trim();
+}
 
 // ==================== AI INSIGHTS (RULE-BASED) ====================
 const AI_INSIGHTS = {
@@ -582,10 +592,22 @@ const DECISION_TYPES = {
 
 const FINAL_DECISION_TYPES = {
   1: 'तामेली',
-  2: 'सुझाव/निर्देशन दिने',
-  3: 'सतर्क गर्ने',
-  4: 'अन्य निर्णय'
+  2: 'सुझाव/निर्देशन',
+  3: 'सतर्क',
+  4: 'अन्य'
 };
+
+function normalizeFinalDecisionType(value) {
+  if (value === undefined || value === null) return '';
+  const v = String(value).trim();
+  if (!v) return '';
+  if (FINAL_DECISION_TYPES[v]) return FINAL_DECISION_TYPES[v];
+  if (FINAL_DECISION_TYPES[Number(v)]) return FINAL_DECISION_TYPES[Number(v)];
+  if (v === 'सुझाव/निर्देशन दिने') return 'सुझाव/निर्देशन';
+  if (v === 'सतर्क गर्ने') return 'सतर्क';
+  if (v === 'अन्य निर्णय') return 'अन्य';
+  return v;
+}
 
 const STATUS_TYPES = {
   PENDING: 'काम बाँकी',
@@ -828,16 +850,11 @@ if (typeof MutationObserver !== 'undefined') {
 
 // नेपाली मिति API प्रयोग गरेर आजको मिति प्राप्त गर्ने
 function getCurrentNepaliDate() {
+    const today = new Date();
+    const adDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     // पहिलो प्राथमिकता: NepaliDatePicker (v5.x)
     if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.ad2bs === 'function') {
         try {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const adDateStr = `${year}-${month}-${day}`;
-            
-            // console.log('AD Date for conversion:', adDateStr);
             const bsDateStr = NepaliDatePicker.ad2bs(adDateStr);
             
             if (bsDateStr && bsDateStr !== adDateStr) {
@@ -852,12 +869,6 @@ function getCurrentNepaliDate() {
     // दोस्रो प्राथमिकता: jQuery plugin
     if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && $.fn.nepaliDatePicker.ad2bs) {
         try {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const adDateStr = `${year}-${month}-${day}`;
-            
             const bsDateStr = $.fn.nepaliDatePicker.ad2bs(adDateStr);
             if (bsDateStr) {
                 return bsDateStr;
@@ -870,11 +881,10 @@ function getCurrentNepaliDate() {
     // तेस्रो प्राथमिकता: NepaliFunctions (v5.x)
     if (typeof NepaliFunctions !== 'undefined' && NepaliFunctions.AD2BS) {
         try {
-            const dt = new Date();
             const bs = NepaliFunctions.AD2BS({ 
-                year: dt.getFullYear(), 
-                month: dt.getMonth() + 1, 
-                day: dt.getDate() 
+                year: today.getFullYear(), 
+                month: today.getMonth() + 1, 
+                day: today.getDate() 
             });
             
             if (bs && bs.year && bs.month && bs.day) {
@@ -885,15 +895,20 @@ function getCurrentNepaliDate() {
         }
     }
     
-    // चौथो प्राथमिकता: Fallback (hardcoded for 2081)
-    // यो सन् २०२५ मा २०८१ चैत देखि २०८२ बैशाख सम्म
-    console.warn('⚠️ Using fallback Nepali date calculation');
+    // चौथो प्राथमिकता: Internal converter (no external library required)
+    try {
+        const converted = convertADtoBS(adDateStr);
+        if (converted) return converted;
+    } catch (e) {
+        console.warn('convertADtoBS failed:', e);
+    }
+
+    // अन्तिम: Fallback (hardcoded)
+    if (!window._warnedFallbackNepaliDate) {
+        window._warnedFallbackNepaliDate = true;
+        console.warn('⚠️ Using fallback Nepali date calculation');
+    }
     return getFallbackNepaliDate();
-    
-    // Fix: Return ISO format (YYYY-MM-DD) for form values and validation
-    const today = new Date();
-    const adDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    return convertADtoBS(adDateStr) || "2082-11-14";
 }
 
 // Helper: Convert Devanagari digits to Latin digits
@@ -908,6 +923,52 @@ function _latinToDevnagari(s) {
   if (s === null || s === undefined) return s;
   const map = { '0':'०','1':'१','2':'२','3':'३','4':'४','5':'५','6':'६','7':'७','8':'८','9':'९' };
   return String(s).replace(/[0-9]/g, d => map[d] || d);
+}
+
+function normalizeStatusCode(raw) {
+  if (raw === null || raw === undefined) return 'pending';
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'pending' || s === 'progress' || s === 'resolved') return s;
+  if (s === 'काम बाँकी' || s === 'काम बाकी' || s === 'बाँकी' || s === 'बाकी') return 'pending';
+  if (s === 'चालु' || s === 'चालू') return 'progress';
+  if (s === 'फछ्रयौट' || s === 'फछ्र्यौट' || s === 'फछर्यौट' || s === 'फछर्यौट') return 'resolved';
+  return 'pending';
+}
+
+function normalizeSourceCode(raw) {
+  if (raw === null || raw === undefined) return 'internal';
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'internal' || s === 'hello_sarkar' || s === 'email' || s === 'phone' || s === 'letter' || s === 'website') return s;
+  if (s === 'आन्तरिक' || s === 'आन्तरीक' || s === 'भित्री' || s === 'भित्रि') return 'internal';
+  if (s === 'हेल्लो सरकार' || s === 'हेलो सरकार' || s === 'hello sarkar') return 'hello_sarkar';
+  return 'internal';
+}
+
+function applyDevanagariDigits(rootEl = document.body) {
+  try {
+    if (!rootEl) return;
+    const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node || !node.parentElement) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        const tag = (p.tagName || '').toLowerCase();
+        if (tag === 'script' || tag === 'style' || tag === 'textarea' || tag === 'input') return NodeFilter.FILTER_REJECT;
+        if (p.isContentEditable) return NodeFilter.FILTER_REJECT;
+        if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+        return /\d/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+
+    const textNodes = [];
+    let n;
+    while ((n = walker.nextNode())) textNodes.push(n);
+
+    for (const tn of textNodes) {
+      tn.nodeValue = _latinToDevnagari(tn.nodeValue);
+    }
+  } catch (e) {
+    // no-op
+  }
 }
 
 // Helper: map Nepali month name to month number
@@ -968,6 +1029,82 @@ function normalizeNepaliDisplayToISO(raw) {
   return s;
 }
 
+// Parse complaint registration date into an AD Date object when possible.
+// Supports:
+// - AD ISO (YYYY-MM-DD)
+// - BS ISO (YYYY-MM-DD) if NepaliFunctions.BS2AD is available
+function _parseComplaintRegDateToAD(complaint) {
+  if (!complaint) return null;
+  const raw = complaint.entryDate || complaint.date || complaint['दर्ता मिति'] || complaint['Entry Date'] || complaint.createdAt || '';
+  if (!raw) return null;
+
+  const iso = normalizeNepaliDisplayToISO(raw);
+  if (!iso) return null;
+
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const da = Number(m[3]);
+  if (!y || !mo || !da) return null;
+
+  // Heuristic: Nepali BS years are generally >= 2050
+  const looksBS = y >= 2050;
+  if (looksBS) {
+    try {
+      // Prefer NepaliDatePicker v5.x if available
+      if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.bs2ad === 'function') {
+        const adStr = NepaliDatePicker.bs2ad(`${y}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`);
+        const ad = normalizeNepaliDisplayToISO(adStr);
+        const d = new Date(ad);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      // jQuery plugin fallback
+      if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && typeof $.fn.nepaliDatePicker.bs2ad === 'function') {
+        const adStr = $.fn.nepaliDatePicker.bs2ad(`${y}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`);
+        const ad = normalizeNepaliDisplayToISO(adStr);
+        const d = new Date(ad);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      // NepaliFunctions fallback (some builds expose it)
+      if (typeof NepaliFunctions !== 'undefined' && typeof NepaliFunctions.BS2AD === 'function') {
+        const adStr = NepaliFunctions.BS2AD(y, mo, da); // expected YYYY-MM-DD
+        const ad = normalizeNepaliDisplayToISO(adStr);
+        const d = new Date(ad);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      // Simple fallback: approximate BS->AD using reference point (not 100% accurate but enables highlighting)
+      // Reference: 2081-01-01 BS ≈ 2024-04-13 AD (approx)
+      const refBS = new Date(2081, 0, 1); // 2081-01-01
+      const refAD = new Date(2024, 3, 13); // 2024-04-13
+      const bsDate = new Date(y, mo - 1, da);
+      const diffDays = Math.floor((bsDate - refBS) / (1000 * 60 * 60 * 24));
+      const approxAD = new Date(refAD.getTime() + diffDays * 24 * 60 * 60 * 1000);
+      return isNaN(approxAD.getTime()) ? null : approxAD;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // AD
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Returns CSS class based on complaint age:
+// - >= 1 year => complaint-old-year (red)
+// - >= 6 months => complaint-old-6mo (orange)
+function getComplaintAgeClass(complaint) {
+  return '';
+}
+
 async function updateNepaliDate() {
     const nepaliDateElement = document.getElementById('currentNepaliDate');
     if (!nepaliDateElement) return;
@@ -986,7 +1123,7 @@ async function updateNepaliDate() {
       const weekdays = ["आइतबार", "सोमबार", "मंगलबार", "बुधबार", "बिहीबार", "शुक्रबार", "शनिबार"];
       const monthName = nepaliMonths[Number(bsMonth) - 1] || "बैशाख";
       const dayName = weekdays[today.getDay()];
-      nepaliDateElement.textContent = `${bsYear} ${monthName} ${Number(bsDay)}, ${dayName}`;
+      nepaliDateElement.textContent = _latinToDevnagari(`${bsYear} ${monthName} ${Number(bsDay)}, ${dayName}`);
       return;
     }
   } catch (e) {
@@ -994,7 +1131,7 @@ async function updateNepaliDate() {
   }
 
   // Fallback: पुरानो गणना
-  nepaliDateElement.textContent = getFallbackNepaliDate();
+  nepaliDateElement.textContent = _latinToDevnagari(getFallbackNepaliDate());
 }
 
 // Fallback function (यदि API fail भयो भने)
@@ -1120,6 +1257,79 @@ function ensureBSDate(raw) {
 }
 
 // ==================== DATE PICKER FUNCTIONS (सुधारिएको) ====================
+function _isNepaliDatePickerAvailable() {
+  try {
+    if (typeof NepaliDatePicker !== 'undefined') return true;
+    if (typeof window !== 'undefined' && window && typeof window.NepaliDatePicker !== 'undefined') return true;
+    if (typeof window !== 'undefined' && window && typeof window.nepaliDatePicker !== 'undefined') return true;
+    if (typeof $ !== 'undefined' && $.fn) {
+      try {
+        const keys = Object.keys($.fn || {});
+        if (keys.some(k => /nepali.*datepicker/i.test(String(k)))) return true;
+      } catch (e) {}
+    }
+  } catch (e) {}
+  return false;
+}
+
+function _getNepaliDatePickerJqMethodName() {
+  try {
+    if (typeof $ === 'undefined' || !$.fn) return '';
+    if (typeof $.fn.nepaliDatePicker === 'function') return 'nepaliDatePicker';
+    if (typeof $.fn.nepaliDatePicker === 'function') return 'nepaliDatePicker';
+    const keys = Object.keys($.fn || {});
+    const match = keys.find(k => /nepali.*datepicker/i.test(String(k)) && typeof $.fn[k] === 'function');
+    return match || '';
+  } catch (e) {}
+  return '';
+}
+
+function _ensureNepaliDatePickerLoaded() {
+  return new Promise((resolve) => {
+    try {
+      if (_isNepaliDatePickerAvailable()) return resolve(true);
+      if (window._ndpCdnLoading) return resolve(false);
+      if (window._ndpCdnTried) return resolve(false);
+
+      window._ndpCdnTried = true;
+      window._ndpCdnLoading = true;
+
+      const cssHref = 'https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.css';
+      const jsSrc = 'https://unpkg.com/nepali-date-picker@2.0.2/dist/nepaliDatePicker.min.js';
+
+      const hasCss = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some(l => (l.href || '').includes('nepaliDatePicker.min.css'));
+      if (!hasCss) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = cssHref;
+        document.head.appendChild(link);
+      }
+
+      const hasJs = Array.from(document.querySelectorAll('script')).some(s => (s.src || '').includes('nepaliDatePicker.min.js'));
+      if (hasJs) {
+        window._ndpCdnLoading = false;
+        return resolve(_isNepaliDatePickerAvailable());
+      }
+
+      const script = document.createElement('script');
+      script.src = jsSrc;
+      script.async = true;
+      script.onload = () => {
+        window._ndpCdnLoading = false;
+        resolve(_isNepaliDatePickerAvailable());
+      };
+      script.onerror = () => {
+        window._ndpCdnLoading = false;
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    } catch (e) {
+      try { window._ndpCdnLoading = false; } catch (_) {}
+      resolve(false);
+    }
+  });
+}
+
 async function initializeDatepickers() {
     console.log('📅 Initializing datepickers...');
     
@@ -1144,23 +1354,26 @@ async function initializeDatepickers() {
         document.head.appendChild(style);
     }
 
-      // If no Nepali datepicker library is present, attempt to load the fallback and retry initialization
-      if (!(typeof NepaliDatePicker !== 'undefined' || (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker))) {
-        if (!window._ndpTriedFallback) {
-          window._ndpTriedFallback = true;
-          console.warn('⚠️ NepaliDatePicker not detected. Attempting to load fallback library...');
+      // If no Nepali datepicker library is present, do not try to load missing local vendor files.
+      // We'll use the in-app fallback picker behavior.
+      if (!_isNepaliDatePickerAvailable()) {
+        const loaded = await _ensureNepaliDatePickerLoaded();
+        if (loaded) {
+          return initializeDatepickers();
+        }
+        if (!window._ndpWarnedMissing) {
+          window._ndpWarnedMissing = true;
           try {
-            loadFallbackLibrary();
-          } catch (e) {
-            console.error('❌ loadFallbackLibrary failed:', e);
-          }
-          // retry after short delay to allow fallback script to load
-          setTimeout(() => {
-            initializeDatepickers(); initializeNepaliDropdowns();
-          }, 800);
-          return;
-        } else {
-          console.warn('⚠️ NepaliDatePicker still not available after fallback attempt. Date inputs will use fallback behavior.');
+            const jq = (typeof $ !== 'undefined' && $ && $.fn) ? $ : null;
+            const keys = jq ? Object.keys(jq.fn || {}).filter(k => String(k).toLowerCase().includes('nepali')) : [];
+            console.log('🧩 NepaliDatePicker detect debug:', {
+              hasJquery: !!jq,
+              pluginKeys: keys.slice(0, 20),
+              hasFnNepaliDatePicker: !!(jq && jq.fn && jq.fn.nepaliDatePicker),
+              hasWindowNepaliDatePicker: !!(window && (window.NepaliDatePicker || window.nepaliDatePicker))
+            });
+          } catch (e) {}
+          console.warn('⚠️ NepaliDatePicker library not detected. Date inputs will use fallback behavior.');
         }
       }
 
@@ -1206,10 +1419,11 @@ async function initializeDatepickers() {
         };
 
         // Library check गर्ने
-        if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker) {
+        const jqMethodName = _getNepaliDatePickerJqMethodName();
+        if (jqMethodName && typeof $ !== 'undefined') {
             try {
                 // jQuery plugin प्रयोग गर्ने
-                $(input).nepaliDatePicker(options);
+                $(input)[jqMethodName](options);
                 input.dataset.ndpInitialized = 'true';
                 console.log('✅ Nepali DatePicker initialized (jQuery) for:', input.id || input.className);
             } catch (e) {
@@ -1619,15 +1833,12 @@ function showSimpleNepaliPicker(input) {
 }
 
 function loadFallbackLibrary() {
-  if (window._fallbackLoading) return;
-  window._fallbackLoading = true;
-  console.log('📥 Loading local NepaliDatePicker fallback...');
-
-  if (typeof $ === 'undefined') {
-    console.warn('⚠️ jQuery not detected. Local fallback will provide conversion functions and a lightweight shim.');
+  // Deprecated: local vendor fallback files are not shipped with this project.
+  // Keep as a safe no-op to avoid repeated 404/MIME errors.
+  if (!window._fallbackDeprecatedWarned) {
+    window._fallbackDeprecatedWarned = true;
+    console.warn('⚠️ Local NepaliDatePicker vendor fallback is disabled (missing vendor files).');
   }
-  // Load local vendor script (non-network) and CSS
-  loadNepaliDatePickerScript();
 }
 
 function loadNepaliDatePickerScript() {
@@ -1843,10 +2054,15 @@ async function getFromGoogleSheets(action, params = {}) {
       // ========== 2. JSONP Callback ==========
       const callbackName = `jsonp_${action}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       url += `&callback=${callbackName}`;
+
+      // Cache busting to avoid stale/redirect cached responses
+      url += `&t=${Date.now()}`;
       
-      console.log(`📡 JSONP Request [${action}]`, url.substring(0, 200) + '...');
+      console.log(`📡 JSONP Request [${action}]`, url);
       
       let isResolved = false;
+      let didTimeout = false;
+      let lateHandled = false;
       let retryCount = 0;
       
       // ========== 3. Timeout ==========
@@ -1863,6 +2079,7 @@ async function getFromGoogleSheets(action, params = {}) {
               // नयाँ callback name बनाउने
               const newCallback = `${callbackName}_retry${retryCount}`;
               url = url.replace(/&callback=[^&]+/, `&callback=${newCallback}`);
+              url = url.replace(/&t=\d+/, `&t=${Date.now()}`);
               
               window[newCallback] = window[callbackName];
               script.src = url;
@@ -1934,12 +2151,16 @@ async function getFromGoogleSheets(action, params = {}) {
       script.onerror = function(error) {
         if (isResolved) return;
         console.error(`❌ JSONP Network Error [${action}]:`, error);
+        try {
+          console.error('❌ JSONP script failed to load:', script && script.src ? script.src : url);
+        } catch (e) {}
         
         // Retry on network error
         if (retryCount < (GOOGLE_SHEETS_CONFIG.MAX_RETRIES || 3)) {
           retryCount++;
           console.log(`🔄 Retry ${retryCount}/${GOOGLE_SHEETS_CONFIG.MAX_RETRIES} for ${action} (network error)`);
           setTimeout(() => {
+            try { url = url.replace(/&t=\d+/, `&t=${Date.now()}`); } catch (e) {}
             const newScript = document.createElement('script');
             newScript.src = url;
             newScript.async = true;
@@ -1949,6 +2170,9 @@ async function getFromGoogleSheets(action, params = {}) {
         } else {
           isResolved = true;
           cleanup();
+          try {
+            showToast('❌ Google Sheets connect हुन सकेन। Apps Script Web App deployment (Anyone access) र URL जाँच गर्नुहोस्।', 'error');
+          } catch (e) {}
           resolve({ 
             success: false, 
             data: [], 
@@ -1998,22 +2222,27 @@ async function postToGoogleSheets(action, data = {}) {
         Object.keys(data).forEach(k => {
           const v = data[k];
           if (v === undefined || v === null) return;
-          const keyLower = String(k).toLowerCase();
-          // if key looks like a date (contains 'date') then add Nepali variants
-          if (keyLower.includes('date')) {
-            try {
-              const nep = _latinToDevnagari(String(v));
-              // For save/update complaint actions, send the main key as Devanagari
-              // so the sheet stores Nepali text; also include an ISO copy usable by backend.
-              if (action === 'saveComplaint' || action === 'updateComplaint' || action === 'saveHelloSarkarComplaint') {
-                enhanced[`${k}Iso`] = String(v);
-                enhanced[k] = nep;
-              } else {
-                // default: add a Nepali variant alongside existing value
-                enhanced[`${k}Nepali`] = nep;
-              }
-            } catch (e) { /* ignore */ }
-          }
+          const keyStr = String(k);
+          const keyLower = keyStr.toLowerCase();
+
+          // if key looks like a date — handle both English and Nepali labels
+          try {
+            const dateRegex = /date|मिति|दर्ता/i;
+            if (dateRegex.test(keyStr)) {
+              try {
+                const nep = _latinToDevnagari(String(v));
+                // For save/update complaint actions, send the main key as Devanagari
+                // so the sheet stores Nepali text; also include an ISO copy usable by backend.
+                if (action === 'saveComplaint' || action === 'updateComplaint' || action === 'saveHelloSarkarComplaint') {
+                  enhanced[`${k}Iso`] = String(v);
+                  enhanced[k] = nep;
+                } else {
+                  // default: add a Nepali variant alongside existing value
+                  enhanced[`${k}Nepali`] = nep;
+                }
+              } catch (e) { /* ignore */ }
+            }
+          } catch (e) {}
         });
       } catch (e) {
         console.warn('Could not enhance payload with Nepali dates:', e);
@@ -2021,6 +2250,23 @@ async function postToGoogleSheets(action, data = {}) {
 
       // This is more robust than manually listing fields.
       // It also sends empty strings, which is correct for clearing a field's value.
+      // Ensure complaint ID fields are saved in Devanagari for complaint actions
+      try {
+        if (action === 'saveComplaint' || action === 'updateComplaint' || action === 'saveHelloSarkarComplaint') {
+          const complaintIdKeys = ['id','complaintid','उजुरीदर्तानं','उजुरीदर्तान','उजुरीदर्तान','उजुरीदर्तानं','शिकायतनं','शिकायतन','उजुरी दर्ता नं','शिकायत नं','Complaint ID'];
+          Object.keys(enhanced).forEach(k => {
+            try {
+              const keyNorm = String(k).replace(/\s+/g,'').replace(/[^a-zA-Z0-9\u0900-\u097F]/g,'').toLowerCase();
+              if (complaintIdKeys.some(c => String(c).replace(/\s+/g,'').toLowerCase() === keyNorm)) {
+                if (enhanced[k] !== undefined && enhanced[k] !== null) {
+                  enhanced[k] = _latinToDevnagari(String(enhanced[k]));
+                }
+              }
+            } catch (e) {}
+          });
+        }
+      } catch (e) {}
+
       Object.keys(enhanced).forEach(key => {
         const value = enhanced[key];
         if (value !== undefined && value !== null) {
@@ -2037,29 +2283,57 @@ async function postToGoogleSheets(action, data = {}) {
       try { console.log('📤 JSONP URL:', url); } catch (e) { /* ignore */ }
       
       let isResolved = false;
+      let didTimeout = false;
+      let lateHandled = false;
       
       // ========== 3. Timeout ==========
       const timeout = setTimeout(() => {
         if (!isResolved) {
-          console.warn(`⚠️ JSONP POST timeout [${action}] - saving locally`);
+          console.warn(`⚠️ JSONP POST timeout [${action}] - treating as local (may have succeeded)`);
+          didTimeout = true;
           isResolved = true;
-          delete window[callbackName];
-          if (script.parentNode) script.parentNode.removeChild(script);
-          
-          // Timeout भयो, data पुगेको हुन सक्छ वा नहुन सक्छ।
-          // यसलाई local मा मात्र सेभ भएको मान्ने ताकि पछि sync गर्न सकियोस्।
-          resolve({ 
-            success: false, 
+
+          // Timeout पछि पनि callback आउन सक्छ, त्यसलाई late-success को रुपमा handle गर्छौं।
+          resolve({
+            success: false,
             message: 'Request timed out. Saved locally for later sync.',
             id: data.id,
             local: true,
-            timeout: true 
+            timeout: true
           });
         }
-      }, GOOGLE_SHEETS_CONFIG.TIMEOUT || 30000);
+      }, GOOGLE_SHEETS_CONFIG.TIMEOUT || 60000);
       
       // ========== 4. JSONP Callback ==========
       window[callbackName] = function(response) {
+        if (lateHandled) return;
+
+        // If the promise already resolved due to timeout, treat this as a late server response.
+        if (didTimeout) {
+          lateHandled = true;
+          try {
+            const isSuccess = response && (response.success === true || response.success === 'true');
+            if (isSuccess) {
+              const id = data.id || response.id;
+              if (id && (action === 'saveComplaint' || action === 'updateComplaint')) {
+                const idx = (state.complaints || []).findIndex(c => String(c.id) === String(id));
+                if (idx !== -1) {
+                  state.complaints[idx].syncedToSheets = true;
+                  backupToLocalStorage();
+                  if (typeof updateSyncButton === 'function') updateSyncButton();
+                }
+              }
+              showToast('✅ उजुरी Google Sheet मा सेभ भयो (ढिलो प्रतिक्रिया)', 'success');
+            }
+          } catch (e) {
+            // ignore late handling errors
+          } finally {
+            try { delete window[callbackName]; } catch (e) {}
+            try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {}
+          }
+          return;
+        }
+
         if (isResolved) return;
         isResolved = true;
         clearTimeout(timeout);
@@ -2072,6 +2346,15 @@ async function postToGoogleSheets(action, data = {}) {
         // Response format normalize गर्ने
         // FIX: Never assume success. Default to failure if response is falsy.
         let formattedResponse = response || { success: false, message: "No response from server", id: data.id, local: true };
+
+        // Some deployments return JSON as string; parse if needed.
+        if (typeof formattedResponse === 'string') {
+          try {
+            formattedResponse = JSON.parse(formattedResponse);
+          } catch (e) {
+            formattedResponse = { success: false, message: formattedResponse, id: data.id, local: true };
+          }
+        }
         
         // If response is an object but lacks a 'success' property, it's an ambiguous situation.
         // To be safe, we should treat it as a failure unless the server explicitly returns success: true.
@@ -2093,20 +2376,73 @@ async function postToGoogleSheets(action, data = {}) {
       script.onerror = function(error) {
         if (isResolved) return;
         console.error(`❌ JSONP POST Network Error [${action}]:`, error);
-        
-        isResolved = true;
-        clearTimeout(timeout);
-        delete window[callbackName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-        
-        // Network error भए पनि local मा save गर्ने
-        resolve({ 
-          success: false, 
-          message: 'Network error - saved locally',
-          id: data.id,
-          local: true,
-          error: error.toString()
-        });
+
+        // Try a one-time fetch POST fallback before giving up to local save.
+        (async () => {
+          try {
+            clearTimeout(timeout);
+            // build POST body from the enhanced payload (same as URL params)
+            const bodyParams = new URLSearchParams();
+            bodyParams.append('action', action);
+            bodyParams.append('apiKey', GOOGLE_SHEETS_CONFIG.API_KEY);
+            Object.keys(enhanced || data).forEach(k => {
+              const v = (enhanced && enhanced[k] !== undefined) ? enhanced[k] : data[k];
+              if (v !== undefined && v !== null) bodyParams.append(k, String(v));
+            });
+
+            console.log('🔁 Attempting fetch POST fallback to Google Sheets webapp');
+
+            const resp = await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: bodyParams.toString(),
+              credentials: 'omit'
+            });
+
+            // Try parse JSON if possible
+            let json = null;
+            try { json = await resp.json(); } catch (e) { json = null; }
+
+            // If response indicates success, mark resolved accordingly
+            if (json && (json.success === true || json.success === 'true')) {
+              isResolved = true;
+              try { delete window[callbackName]; } catch (e) {}
+              try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {}
+
+              // mark synced in local state if possible
+              const id = data.id || json.id;
+              if (id && (action === 'saveComplaint' || action === 'updateComplaint')) {
+                const idx = (state.complaints || []).findIndex(c => String(c.id) === String(id));
+                if (idx !== -1) {
+                  state.complaints[idx].syncedToSheets = true;
+                  backupToLocalStorage();
+                  if (typeof updateSyncButton === 'function') updateSyncButton();
+                }
+              }
+
+              resolve(json);
+              return;
+            }
+
+            // If fetch returned but not successful, fall through to local save.
+          } catch (fetchError) {
+            console.warn('Fallback fetch POST failed:', fetchError);
+          }
+
+          // Final fallback: treat as local save
+          if (isResolved) return;
+          isResolved = true;
+          clearTimeout(timeout);
+          try { delete window[callbackName]; } catch (e) {}
+          try { if (script && script.parentNode) script.parentNode.removeChild(script); } catch (e) {}
+          resolve({ 
+            success: false, 
+            message: 'Network error - saved locally',
+            id: data.id,
+            local: true,
+            error: String(error)
+          });
+        })();
       };
       
       document.head.appendChild(script);
@@ -2216,25 +2552,62 @@ async function loadDataFromGoogleSheets(forceReload = false) {
       
       showToast(`✅ ${state.complaints.length} उजुरीहरू लोड भयो`, 'success');
       
-      // ===== STEP 5: UPDATE UI =====
-      if (state.currentPage === 'dashboardPage' || state.currentPage === 'dashboard') {
+      // ===== STEP 5: LOAD OTHER DATA TYPES (non-blocking but awaited for view consistency) =====
+    try {
+      const [empRes, ccRes, projectsRes] = await Promise.all([
+        getFromGoogleSheets('getEmployeeMonitoring'),
+        getFromGoogleSheets('getCitizenCharter'),
+        getFromGoogleSheets('getProjects')
+      ]);
+
+      if (empRes && empRes.success && Array.isArray(empRes.data)) {
+        const formattedEmp = empRes.data.map(formatEmployeeMonitoringFromSheet).filter(Boolean);
+        state.employeeMonitoring = formattedEmp;
+        localStorage.setItem('nvc_employee_monitoring_backup', JSON.stringify(state.employeeMonitoring));
+      }
+
+      if (ccRes && ccRes.success && Array.isArray(ccRes.data)) {
+        const formattedCc = ccRes.data.map(formatCitizenCharterFromSheet).filter(Boolean);
+        state.citizenCharters = formattedCc;
+        localStorage.setItem('nvc_citizen_charters_backup', JSON.stringify(state.citizenCharters));
+      }
+
+      // ===== Projects =====
+      if (projectsRes && projectsRes.success && Array.isArray(projectsRes.data)) {
+        const formattedProjects = projectsRes.data.map(formatProjectFromSheet).filter(Boolean);
+        state.projects = formattedProjects;
+        try { localStorage.setItem('nvc_projects_backup', JSON.stringify(state.projects)); } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not load Employee Monitoring / Citizen Charter from Sheets:', e);
+    }
+
+    // ===== STEP 6: UPDATE UI =====
+    if (state.currentPage === 'dashboardPage' || state.currentPage === 'dashboard') {
         // ===== STEP 5: UPDATE UI & RUN POST-LOAD TASKS =====
         if (typeof monitorHotspotAlerts === 'function') {
           monitorHotspotAlerts();
         }
 
         if (typeof updateStats === 'function') updateStats();
-        setTimeout(() => {
-          if (typeof destroyAllCharts === 'function') destroyAllCharts();
-          if (typeof initializeDashboardCharts === 'function') initializeDashboardCharts();
-        }, 300);
-      }
+      updatePendingCountBadge();
+      setTimeout(() => {
+        if (typeof destroyAllCharts === 'function') destroyAllCharts();
+        if (typeof initializeDashboardCharts === 'function') initializeDashboardCharts();
+      }, 300);
+    }
+
+      if (state.currentPage === 'mainPage') {
+        if (typeof updateStats === 'function') updateStats();
+      updatePendingCountBadge();
+    }
       
       if (state.currentView === 'complaints' || state.currentView === 'all_complaints') {
         showComplaintsView();
       }
       
       if (typeof updateSyncButton === 'function') updateSyncButton();
+      if (typeof loadSidebarNavigation === 'function') loadSidebarNavigation();
 
       window._lastLoadResult = true;
       return true;
@@ -2477,7 +2850,7 @@ function formatComplaintFromSheet(sheetData) {
       description: String(getValue('description', 'complaintDescription', 'उजुरीको संक्षिप्त विवरण', 'विवरण')),
       shakha: String(getValue('shakha', 'shakhaName', 'assignedShakha', 'सम्बन्धित शाखा', 'शाखा', 'Branch', 'Entry Branch')),
       mahashakha: String(getValue('mahashakha', 'mahashakhaName', 'महाशाखा')),
-      status: String(getValue('status', 'स्थिति') || 'pending'),
+      status: normalizeStatusCode(getValue('status', 'स्थिति') || 'pending'),
       entryDate: String(getValue('entryDate', 'Entry Date', 'createdAt', 'सिर्जना मिति')),
       // Corrected Decision Fields
       // Merges old 'प्रस्तावित निर्णय' into 'समितिको निर्णय'
@@ -2485,9 +2858,9 @@ function formatComplaintFromSheet(sheetData) {
       // Free-text final decision
       decision: String(getValue('decision', 'अन्तिम निर्णय', 'निर्णय')),
       // Dropdown for final decision type
-      finalDecision: String(getValue('finalDecision', 'अन्तिम निर्णयको प्रकार')),
+      finalDecision: normalizeFinalDecisionType(String(getValue('finalDecision', 'अन्तिम निर्णयको प्रकार'))),
       remarks: String(getValue('remarks', 'कैफियत')),
-      source: String(getValue('source', 'उजुरीको माध्यम') || 'internal'),
+      source: normalizeSourceCode(getValue('source', 'उजुरीको माध्यम') || 'internal'),
       correspondenceDate: String(getValue('correspondenceDate', 'पत्राचार मिति')),
       investigationDetails: String(getValue('investigationDetails', 'छानबिनको विवरण')),
       assignedShakha: String(getValue('assignedShakha', 'shakha', 'shakhaName', 'सम्बन्धित शाखा', 'शाखा')),
@@ -2500,7 +2873,7 @@ function formatComplaintFromSheet(sheetData) {
       updatedBy: String(getValue('updatedBy', 'अपडेट गर्ने')),
       updatedAt: String(getValue('updatedAt', 'अपडेट मिति')),
       syncedToSheets: true,
-      province: String(getValue('province', 'प्रदेश')),
+      province: normalizeProvinceName(String(getValue('province', 'प्रदेश'))),
       district: String(getValue('district', 'जिल्ला')),
       location: String(getValue('location', 'स्थानीय तह')),
       ward: String(getValue('ward', 'वडा')),
@@ -2570,9 +2943,145 @@ function loadFromLocalStorage() {
 function backupToLocalStorage() {
   try {
     localStorage.setItem('nvc_complaints_backup', JSON.stringify(state.complaints));
+    localStorage.setItem('nvc_employee_monitoring_backup', JSON.stringify(state.employeeMonitoring || []));
+    localStorage.setItem('nvc_citizen_charters_backup', JSON.stringify(state.citizenCharters || []));
+    localStorage.setItem('nvc_projects_backup', JSON.stringify(state.projects || []));
   } catch (e) {
     console.warn('⚠️ Could not save to localStorage:', e);
   }
+}
+
+function formatProjectFromSheet(sheetData) {
+  if (!sheetData) return null;
+
+  const getValue = (...keys) => {
+    for (const key of keys) {
+      if (sheetData[key] !== undefined && sheetData[key] !== null && String(sheetData[key]).trim() !== '') {
+        return sheetData[key];
+      }
+      const foundKey = Object.keys(sheetData).find(k => String(k).trim().toLowerCase() === String(key).trim().toLowerCase());
+      if (foundKey && sheetData[foundKey] !== undefined && sheetData[foundKey] !== null && String(sheetData[foundKey]).trim() !== '') {
+        return sheetData[foundKey];
+      }
+    }
+    return '';
+  };
+
+  const id = String(getValue('project_id', 'id', 'projectId', 'आयोजना आईडी', 'आयोजना id') || '').trim();
+  if (!id) return null;
+
+  return {
+    id,
+    name: String(getValue('name', 'project_name', 'आयोजनाको नाम') || ''),
+    organization: String(getValue('organization', 'agency', 'सम्बन्धित निकाय') || ''),
+    inspectionDate: String(getValue('inspectionDate', 'inspection_date', 'अनुगमन मिति', 'परीक्षण मिति') || ''),
+    nonCompliances: String(getValue('nonCompliances', 'ncr', 'अपारिपालन', 'अपरिपालनहरु') || ''),
+    improvementLetterDate: String(getValue('improvementLetterDate', 'improvement_letter_date') || ''),
+    improvementInfo: String(getValue('improvementInfo', 'improvement_info') || ''),
+    status: String(getValue('status', 'स्थिति') || 'pending'),
+    remarks: String(getValue('remarks', 'कैफियत') || ''),
+    shakha: String(getValue('shakha', 'branch') || ''),
+    createdBy: String(getValue('createdBy', 'सिर्जना गर्ने') || ''),
+    createdAt: String(getValue('createdAt', 'सिर्जना मिति') || '')
+  };
+}
+
+function displayShakhaName(val) {
+  if (!val) return '';
+  // If value is a known code, map to Nepali display name
+  if (SHAKHA && SHAKHA[val]) return SHAKHA[val];
+  // If value already matches a display name, return as-is
+  const foundKey = Object.keys(SHAKHA || {}).find(k => (SHAKHA[k] || '').toLowerCase() === String(val).toLowerCase());
+  if (foundKey) return SHAKHA[foundKey];
+  return val;
+}
+
+function formatEmployeeMonitoringFromSheet(sheetData) {
+  if (!sheetData) return null;
+
+  const getValue = (...keys) => {
+    for (const key of keys) {
+      if (sheetData[key] !== undefined && sheetData[key] !== null && String(sheetData[key]).trim() !== '') {
+        return sheetData[key];
+      }
+      const foundKey = Object.keys(sheetData).find(k => String(k).trim().toLowerCase() === String(key).trim().toLowerCase());
+      if (foundKey && sheetData[foundKey] !== undefined && sheetData[foundKey] !== null && String(sheetData[foundKey]).trim() !== '') {
+        return sheetData[foundKey];
+      }
+    }
+    return '';
+  };
+
+  const id = String(getValue('monitoring_id', 'id', 'monitoringId', 'अनुगमन आईडी', 'अनुगमन id', 'अनुगमन नम्बर', 'अनुगमन नं') || '').trim();
+  if (!id) return null;
+
+  return {
+    id,
+    date: String(getValue('date', 'मिति', 'अनुगमन मिति') || ''),
+    organization: String(getValue('organization', 'निकाय', 'अनुगमन गरेको निकाय') || ''),
+    uniformViolation: String(getValue('uniformViolation', 'पोशाक अपरिपालना', 'तोकिएको पोशाक नलगाउने कर्मचारी') || ''),
+    timeViolation: String(getValue('timeViolation', 'समय अपरिपालना', 'समय पालना नगर्ने कर्मचारी') || ''),
+    instructionDate: String(getValue('instructionDate', 'निर्देशन मिति') || ''),
+    remarks: String(getValue('remarks', 'कैफियत') || ''),
+    createdBy: String(getValue('createdBy', 'सिर्जना गर्ने') || ''),
+    createdAt: String(getValue('createdAt', 'सिर्जना मिति') || ''),
+    updatedBy: String(getValue('updatedBy', 'अपडेट गर्ने') || ''),
+    updatedAt: String(getValue('updatedAt', 'अपडेट मिति') || '')
+  };
+}
+
+function formatCitizenCharterFromSheet(sheetData) {
+  if (!sheetData) return null;
+
+  const getValue = (...keys) => {
+    for (const key of keys) {
+      if (sheetData[key] !== undefined && sheetData[key] !== null && String(sheetData[key]).trim() !== '') {
+        return sheetData[key];
+      }
+      const foundKey = Object.keys(sheetData).find(k => String(k).trim().toLowerCase() === String(key).trim().toLowerCase());
+      if (foundKey && sheetData[foundKey] !== undefined && sheetData[foundKey] !== null && String(sheetData[foundKey]).trim() !== '') {
+        return sheetData[foundKey];
+      }
+    }
+    return '';
+  };
+
+  const id = String(getValue('charter_id', 'id', 'charterId', 'बडापत्र आईडी', 'बडापत्र id', 'अनुगमन आईडी') || '').trim();
+  if (!id) return null;
+
+  return {
+    id,
+    date: String(getValue('date', 'मिति', 'अनुगमन मिति') || ''),
+    organization: String(getValue('organization', 'निकाय', 'अनुगमन गरेको निकाय') || ''),
+    findings: String(getValue('findings', 'अनुगमनबाट देखिएको अवस्था', 'नागरिक बडापत्र अनुगमनबाट देखिएको अवस्था') || ''),
+    instructions: String(getValue('instructions', 'निर्देशन', 'केन्द्रबाट दिइएको निर्देशन') || ''),
+    instructionDate: String(getValue('instructionDate', 'निर्देशन मिति') || ''),
+    remarks: String(getValue('remarks', 'कैफियत') || ''),
+    createdBy: String(getValue('createdBy', 'सिर्जना गर्ने') || ''),
+    createdAt: String(getValue('createdAt', 'सिर्जना मिति') || ''),
+    updatedBy: String(getValue('updatedBy', 'अपडेट गर्ने') || ''),
+    updatedAt: String(getValue('updatedAt', 'अपडेट मिति') || '')
+  };
+}
+
+function updatePendingCountBadge() {
+  try {
+    const el = document.getElementById('pendingCount');
+    if (!el) return;
+    if (!state.currentUser) return;
+
+    let list = state.complaints || [];
+    if (state.currentUser.role === 'shakha') {
+      list = list.filter(c => c.shakha === SHAKHA[state.currentUser.shakha] || c.shakha === state.currentUser.shakha);
+    } else if (state.currentUser.role === 'mahashakha') {
+      list = list.filter(c => c.mahashakha === state.currentUser.mahashakha || c.mahashakha === state.currentUser.name);
+    } else if (state.currentUser.role === 'admin_planning') {
+      list = list.filter(c => c.source === 'hello_sarkar');
+    }
+
+    const pending = list.filter(c => c.status === 'pending').length;
+    el.textContent = _latinToDevnagari(pending);
+  } catch (e) {}
 }
 
 async function syncAllDataToGoogleSheets() {
@@ -2765,7 +3274,7 @@ async function saveNewComplaint() {
     'Branch': shakhaName || shakhaToSave, // Main key for sheet
     
     'Entry Branch': shakhaName || shakhaToSave,
-    province: document.getElementById('complaintProvince')?.value || '',
+    province: normalizeProvinceName(document.getElementById('complaintProvince')?.value || ''),
     district: document.getElementById('complaintDistrict')?.value || '',
     location: document.getElementById('complaintLocation')?.value || ''
   };
@@ -2792,6 +3301,9 @@ async function saveNewComplaint() {
     createdBy: state.currentUser?.name || '',
     createdAt: new Date().toISOString(),
     entryDate: new Date().toISOString().slice(0, 10),
+    province: normalizeProvinceName(document.getElementById('complaintProvince')?.value || ''),
+    district: document.getElementById('complaintDistrict')?.value || '',
+    location: document.getElementById('complaintLocation')?.value || '',
     syncedToSheets: result?.success === true,
     source: 'internal'
   };
@@ -2898,6 +3410,7 @@ function openModal(title, content) {
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = content;
   document.getElementById('complaintModal').classList.remove('hidden');
+  applyDevanagariDigits(document.getElementById('complaintModal'));
   
   // मोडल खुलिसकेपछि Datepicker initialize गर्ने
   setTimeout(() => {
@@ -2918,6 +3431,7 @@ async function saveComplaintToGoogleSheets(complaintData) {
       status: complaintData.status || 'pending',
       proposedDecision: complaintData.proposedDecision || '',
       decision: complaintData.decision || '',
+      finalDecision: normalizeFinalDecisionType(complaintData.finalDecision || ''),
       remarks: complaintData.remarks || '',
       source: complaintData.source || 'internal',
       createdBy: state.currentUser?.name || '',
@@ -2936,7 +3450,7 @@ async function saveComplaintToGoogleSheets(complaintData) {
       mahashakha: complaintData.mahashakha,
       status: complaintData.status || 'pending',
       proposedDecision: complaintData.proposedDecision,
-      finalDecision: complaintData.decision,
+      finalDecision: normalizeFinalDecisionType(complaintData.finalDecision || ''),
       remarks: complaintData.remarks,
       source: complaintData.source || 'internal',
       createdBy: state.currentUser?.name
@@ -2952,6 +3466,7 @@ async function saveComplaintToGoogleSheets(complaintData) {
         status: complaintData.status || 'pending',
         proposedDecision: complaintData.proposedDecision,
         decision: complaintData.decision,
+        finalDecision: normalizeFinalDecisionType(complaintData.finalDecision || ''),
         remarks: complaintData.remarks,
         source: complaintData.source || 'internal'
       };
@@ -2977,7 +3492,7 @@ async function updateComplaintInGoogleSheets(complaintId, updateData) {
   try {
     const result = await postToGoogleSheets('updateComplaint', {
       id: complaintId, status: updateData.status,
-      finalDecision: updateData.decision,
+      finalDecision: normalizeFinalDecisionType(updateData.finalDecision || ''),
       remarks: updateData.remarks,
       updatedBy: state.currentUser?.name
     });
@@ -3141,7 +3656,7 @@ function printComplaint(complaintId) {
         <div class="row"><div class="label">उजुरकर्ताको नाम:</div><div class="value">${complaint.complainant}</div></div>
         <div class="row"><div class="label">विपक्षी:</div><div class="value">${complaint.accused || '-'}</div></div>
         <div class="row"><div class="label">उजुरीको विवरण:</div><div class="value">${complaint.description}</div></div>
-        <div class="row"><div class="label">सम्बन्धित शाखा:</div><div class="value">${complaint.shakha || '-'}</div></div>
+        <div class="row"><div class="label">सम्बन्धित शाखा:</div><div class="value">${displayShakhaName(complaint.shakha) || '-'}</div></div>
         <div class="row"><div class="label">स्थिति:</div><div class="value">${complaint.status === 'pending' ? 'काम बाँकी' : complaint.status === 'progress' ? 'चालु' : 'फछ्रयौट'}</div></div>
       </div>
       <div class="footer">
@@ -3471,6 +3986,7 @@ function openModal(title, content) {
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalBody').innerHTML = content;
   document.getElementById('complaintModal').classList.remove('hidden');
+  applyDevanagariDigits(document.getElementById('complaintModal'));
 }
 
 function closeModal() {
@@ -3527,13 +4043,7 @@ async function loadNotifications() {
       }
   }
 
-  // 3. Combine with dummy data for demo
-  const dummyNotifications = [
-    { id: '1', title: 'नयाँ उजुरी दर्ता', time: '१० मिनेट अघि', read: false, targetShakha: 'all', type: 'info' },
-    { id: '2', title: 'समिति बैठक', time: '२ घण्टा अघि', read: true, targetShakha: 'all', type: 'warning' }
-  ];
-  
-  let allNotifications = [...localPushed, ...remoteNotifications, ...dummyNotifications];
+  let allNotifications = [...localPushed, ...remoteNotifications];
   
   // Filter out deleted notifications
   const deletedIds = JSON.parse(localStorage.getItem('nvc_deleted_notifications') || '[]');
@@ -3978,9 +4488,9 @@ function updateStats() {
   const pendingEl = document.getElementById('pendingComplaintsMain');
   const resolvedEl = document.getElementById('resolvedComplaintsMain');
   
-  if (totalEl) totalEl.textContent = total;
-  if (pendingEl) pendingEl.textContent = pending;
-  if (resolvedEl) resolvedEl.textContent = resolved;
+  if (totalEl) totalEl.textContent = _latinToDevnagari(total);
+  if (pendingEl) pendingEl.textContent = _latinToDevnagari(pending);
+  if (resolvedEl) resolvedEl.textContent = _latinToDevnagari(resolved);
 }
 
 function setupEventListeners() {
@@ -4092,7 +4602,7 @@ function loadSidebarNavigation() {
     const helloSarkarPending = state.complaints.filter(c => c.source === 'hello_sarkar' && c.status === 'pending').length;
     navItems = `
       <a href="#" class="nav-item active" onclick="showDashboardView()"><i class="fas fa-tachometer-alt"></i><span class="nav-text">ड्यासबोर्ड</span></a>
-      <a href="#" class="nav-item" onclick="showAdminComplaintsView()"><i class="fas fa-file-alt"></i><span class="nav-text">हेलो सरकार उजुरीहरू</span><span class="badge badge-danger ms-auto">${helloSarkarPending}</span></a>
+      <a href="#" class="nav-item" onclick="showAdminComplaintsView()"><i class="fas fa-file-alt"></i><span class="nav-text">हेलो सरकार उजुरीहरू</span><span class="badge badge-danger ms-auto" id="pendingCount">${helloSarkarPending}</span></a>
       <a href="#" class="nav-item" onclick="showEmployeeMonitoringView()"><i class="fas fa-user-clock"></i><span class="nav-text">कार्यालय अनुगमन</span></a>
       <a href="#" class="nav-item" onclick="showCitizenCharterView()"><i class="fas fa-file-contract"></i><span class="nav-text">नागरिक बडापत्र अनुगमन</span></a>
       <a href="#" class="nav-item" onclick="showReportsView()"><i class="fas fa-chart-bar"></i><span class="nav-text">रिपोर्टहरू</span></a>
@@ -4117,6 +4627,7 @@ function loadSidebarNavigation() {
   }
   
   nav.innerHTML = navItems;
+  applyDevanagariDigits(nav);
 }
 
 function initializeDashboardCharts() {
@@ -4664,10 +5175,29 @@ function initializeDashboardCharts() {
 }
 
 function showChartDrillDown(filters, title) {
-    let filtered = state.complaints;
-    
-    if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
-    if (filters.shakha) filtered = filtered.filter(c => c.shakha === filters.shakha);
+  // Start with complaints scoped to the current user's view (respect branch/mahashakha)
+  let filtered = (state.complaints || []).slice();
+
+  if (state.currentUser && state.currentUser.role === 'shakha') {
+    const userShakhaName = (state.currentUser.shakha || '').trim();
+    const userCode = (state.currentUser.id || '').trim();
+    filtered = filtered.filter(c => {
+      const cShakha = (c.shakha || '').trim();
+      return cShakha === userShakhaName || 
+           cShakha.toLowerCase() === userCode.toLowerCase() ||
+           SHAKHA[cShakha] === userShakhaName ||
+           SHAKHA[cShakha.toUpperCase()] === userShakhaName;
+    });
+  } else if (state.currentUser && state.currentUser.role === 'mahashakha') {
+    filtered = filtered.filter(c => c.mahashakha === state.currentUser.mahashakha || c.mahashakha === state.currentUser.name);
+    const mahashakhaFilter = document.getElementById('mahashakhaFilterShakha');
+    if (mahashakhaFilter && mahashakhaFilter.value) {
+      filtered = filtered.filter(c => c.shakha === mahashakhaFilter.value);
+    }
+  }
+
+  if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
+  if (filters.shakha) filtered = filtered.filter(c => c.shakha === filters.shakha);
     
     if (filters.monthIndex) {
         filtered = filtered.filter(c => {
@@ -4762,6 +5292,7 @@ function showDashboardView() {
   
   const contentArea = document.getElementById('contentArea');
   if (contentArea) contentArea.innerHTML = content;
+  applyDevanagariDigits(contentArea);
   
   // Render AI insights if it's an admin dashboard
   if (state.currentUser.role === 'admin') {
@@ -4951,7 +5482,7 @@ function showAdminDashboard() {
             <tbody>
               ${state.complaints.slice(0, 5).map(complaint => `
                 <tr>
-                  <td data-label="दर्ता नं">${complaint.id}</td><td data-label="दर्ता मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="सम्बन्धित शाखा">${complaint.shakha || '-'}</td>
+                  <td data-label="दर्ता नं">${complaint.id}</td><td data-label="दर्ता मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.shakha) || '-'}</td>
                   <td data-label="उजुरीको संक्षिप्त विवरण" class="text-limit">${(complaint.description || '').substring(0, 50)}...</td>
                   <td data-label="उजुरीको स्थिति"><span class="status-badge ${complaint.status === 'resolved' ? 'status-resolved' : complaint.status === 'pending' ? 'status-pending' : 'status-progress'}">${complaint.status === 'resolved' ? 'फछ्रयौट' : complaint.status === 'pending' ? 'काम बाँकी' : 'चालु'}</span></td>
                   <td data-label="कार्य"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button></td>
@@ -5003,7 +5534,7 @@ function showAdminPlanningDashboard() {
               ${helloSarkarComplaints.slice(0, 5).map((complaint, index) => `
                 <tr>
                   <td data-label="क्र.सं.">${index + 1}</td><td data-label="प्राप्त मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
-                  <td data-label="उजुरीको संक्षिप्त विवरण" class="text-limit">${(complaint.description || '').substring(0, 50)}...</td><td data-label="सम्बन्धित शाखा">${complaint.assignedShakha || '-'}</td>
+                  <td data-label="उजुरीको संक्षिप्त विवरण" class="text-limit">${(complaint.description || '').substring(0, 50)}...</td><td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha) || '-'}</td>
                   <td data-label="उजुरीको स्थिति"><span class="status-badge ${complaint.status === 'resolved' ? 'status-resolved' : complaint.status === 'pending' ? 'status-pending' : 'status-progress'}">${complaint.status === 'resolved' ? 'फछ्रयौट' : complaint.status === 'pending' ? 'काम बाँकी' : 'चालु'}</span></td>
                 </tr>
               `).join('')}
@@ -5113,7 +5644,7 @@ function showMahashakhaDashboard() {
             <tbody>
               ${mahashakhaComplaints.slice(0, 5).map(complaint => `
                 <tr>
-                  <td data-label="दर्ता नं">${complaint.id}</td><td data-label="दर्ता मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="सम्बन्धित शाखा">${complaint.shakha || '-'}</td>
+                  <td data-label="दर्ता नं">${complaint.id}</td><td data-label="दर्ता मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.shakha) || '-'}</td>
                   <td data-label="उजुरीको संक्षिप्त विवरण" class="text-limit">${(complaint.description || '').substring(0, 50)}...</td>
                   <td data-label="उजुरीको स्थिति"><span class="status-badge ${complaint.status === 'resolved' ? 'status-resolved' : complaint.status === 'pending' ? 'status-pending' : 'status-progress'}">${complaint.status === 'resolved' ? 'फछ्रयौट' : complaint.status === 'pending' ? 'काम बाँकी' : 'चालु'}</span></td>
                   <td data-label="कार्य"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button></td>
@@ -5358,7 +5889,7 @@ function showShakhaDashboard() {
             <thead><tr><th>दर्ता नं</th><th>दर्ता मिति</th><th>उजुरकर्ता</th><th>विपक्षी</th><th>उजुरीको संक्षिप्त विवरण</th><th>उजुरीको स्थिति</th><th>कार्य</th></tr></thead>
             <tbody>
               ${shakhaComplaints.slice(0, 5).map(complaint => `
-                <tr>
+                <tr class="${getComplaintAgeClass(complaint)}">
                   <td data-label="दर्ता नं">${complaint.id}</td><td data-label="दर्ता मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
                   <td data-label="उजुरीको संक्षिप्त विवरण" class="text-limit">${(complaint.description || '').substring(0, 50)}...</td>
                   <td data-label="उजुरीको स्थिति"><span class="status-badge ${complaint.status === 'resolved' ? 'status-resolved' : complaint.status === 'pending' ? 'status-pending' : 'status-progress'}">${complaint.status === 'resolved' ? 'फछ्रयौट' : complaint.status === 'pending' ? 'काम बाँकी' : 'चालु'}</span></td>
@@ -5414,7 +5945,7 @@ function showComplaintsView(initialFilters = {}) {
   
   // Filter based on search and status
   const statusFilter = initialFilters.status || '';
-  const priorityFilter = initialFilters.priority || '';
+  const finalDecisionTypeFilter = initialFilters.finalDecisionType || '';
   const shakhaFilter = initialFilters.shakha || '';
   const searchField = initialFilters.searchField || 'all';
   const searchFilter = (initialFilters.search || '').toLowerCase();
@@ -5426,12 +5957,9 @@ function showComplaintsView(initialFilters = {}) {
     complaintsToShow = complaintsToShow.filter(c => c.status === statusFilter);
   }
 
-  if (priorityFilter) {
-    complaintsToShow = complaintsToShow.filter(c => {
-        // Analyze priority on the fly if not stored
-        const analysis = AI_SYSTEM.analyzeComplaint(c.description || '');
-        return analysis.priority === priorityFilter;
-    });
+  if (finalDecisionTypeFilter) {
+    const selected = normalizeFinalDecisionType(finalDecisionTypeFilter);
+    complaintsToShow = complaintsToShow.filter(c => normalizeFinalDecisionType(c.finalDecision || c['अन्तिम निर्णयको प्रकार'] || '') === selected);
   }
 
   if (shakhaFilter) {
@@ -5567,16 +6095,22 @@ function showComplaintsView(initialFilters = {}) {
         statusText = 'चालु';
         statusClass = 'status-progress';
       }
+
+      const ageClass = getComplaintAgeClass(complaint);
       
+      const fullDescription = (description || '').replace(/\n/g, '<br>');
+      const fullCommittee = (complaint.committeeDecision || '').replace(/\n/g, '<br>');
+      const fullDecision = (decision || '').replace(/\n/g, '<br>');
+
       tableRows += `
-        <tr>
+        <tr class="${ageClass}">
           <td data-label="दर्ता नं"><strong>${id}</strong></td>
           <td data-label="मिति">${date} ${priorityBadge}</td>
           <td data-label="उजुरकर्ता">${complainant}</td>
           <td data-label="विपक्षी">${accused}</td>
-          <td data-label="उजुरीको विवरण" class="text-limit" title="${description}">${description.substring(0, 50)}${description.length > 50 ? '...' : ''}</td>
-          <td data-label="समितिको निर्णय" class="text-limit" title="${complaint.committeeDecision || ''}">${(complaint.committeeDecision || '').substring(0, 30)}${(complaint.committeeDecision || '').length > 30 ? '...' : ''}</td>
-          <td data-label="अन्तिम निर्णय" class="text-limit" title="${decision || ''}">${(decision || '').substring(0, 30)}${(decision || '').length > 30 ? '...' : ''}</td>
+          <td data-label="उजुरीको विवरण" title="${description}">${fullDescription}</td>
+          <td data-label="समितिको निर्णय" title="${complaint.committeeDecision || ''}">${fullCommittee}</td>
+          <td data-label="अन्तिम निर्णय" title="${decision || ''}">${fullDecision}</td>
           <td data-label="कैफियत">${remarks}</td>
           <td data-label="शाखा">${shakha}</td>
           <td data-label="स्थिति"><span class="status-badge ${statusClass}">${statusText}</span></td>
@@ -5644,11 +6178,12 @@ function showComplaintsView(initialFilters = {}) {
                         <option value="progress" ${statusFilter === 'progress' ? 'selected' : ''}>चालु</option>
                         <option value="resolved" ${statusFilter === 'resolved' ? 'selected' : ''}>फछ्रयौट</option>
                     </select>
-                    <select class="form-select form-select-sm" id="filterPriority" style="min-width: 100px;">
-                        <option value="">प्राथमिकता (सबै)</option>
-                        <option value="उच्च" ${priorityFilter === 'उच्च' ? 'selected' : ''}>उच्च</option>
-                        <option value="मध्यम" ${priorityFilter === 'मध्यम' ? 'selected' : ''}>मध्यम</option>
-                        <option value="साधारण" ${priorityFilter === 'साधारण' ? 'selected' : ''}>साधारण</option>
+                    <select class="form-select form-select-sm" id="filterFinalDecisionType" style="min-width: 130px;">
+                        <option value="">केन्द्रको निर्णय (सबै)</option>
+                        <option value="तामेली" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'तामेली' ? 'selected' : ''}>तामेली</option>
+                        <option value="सुझाव/निर्देशन" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'सुझाव/निर्देशन' ? 'selected' : ''}>सुझाव/निर्देशन</option>
+                        <option value="सतर्क" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'सतर्क' ? 'selected' : ''}>सतर्क</option>
+                        <option value="अन्य" ${normalizeFinalDecisionType(finalDecisionTypeFilter) === 'अन्य' ? 'selected' : ''}>अन्य</option>
                     </select>
                     <select class="form-select form-select-sm" id="filterShakha" style="min-width: 120px;">
                         ${shakhaOptions}
@@ -5749,6 +6284,7 @@ function showComplaintsView(initialFilters = {}) {
   if (contentArea) {
     contentArea.innerHTML = content;
     console.log('✅ Content area updated');
+    applyDevanagariDigits(contentArea);
     
     // If filters were provided from the UI's filter action, avoid re-triggering
     // filterComplaintsTable to prevent a render loop. filterComplaintsTable will
@@ -5930,10 +6466,10 @@ function showAdminComplaintsView(initialFilters = {}) {
             <thead><tr><th>क्र.सं.</th><th>मिति</th><th>उजुरकर्ता</th><th>विपक्षी</th><th>उजुरीको विवरण</th><th>सम्बन्धित शाखा</th><th>शाखामा पठाएको मिति</th><th>निर्णय</th><th>कैफियत</th><th>कार्य</th></tr></thead>
             <tbody id="adminComplaintsTable">
               ${helloSarkarComplaints.map((complaint, index) => `
-                <tr>
+                <tr class="${getComplaintAgeClass(complaint)}">
                   <td data-label="क्र.सं.">${index + 1}</td><td data-label="मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
                   <td data-label="उजुरीको विवरण" class="text-limit" title="${complaint.description}">${complaint.description.substring(0, 50)}...</td>
-                  <td data-label="सम्बन्धित शाखा">${complaint.assignedShakha || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
+                  <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha) || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
                   <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.substring(0, 30) + '...' : '-'}</td>
                   <td data-label="कैफियत">${complaint.remarks || '-'}</td>
                   <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button></div></td>
@@ -5947,6 +6483,7 @@ function showAdminComplaintsView(initialFilters = {}) {
   `;
   
   document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
   if (initialFilters.status || initialFilters.search) {
     setTimeout(filterAdminComplaints, 100);
   }
@@ -6075,6 +6612,7 @@ function showNewComplaintView() {
   `;
   
   document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
   updateActiveNavItem();
   
   setTimeout(() => {
@@ -6254,10 +6792,11 @@ async function saveHelloSarkarComplaint() {
   
   showLoadingIndicator(true);
 
+  const assignedShakhaName = SHAKHA[assignedShakha] || assignedShakha;
   const newComplaint = {
     id, date, complainant, accused: accused || '', description,
-    assignedShakha, assignedDate: assignedDate || '', status,
-    remarks: remarks || '', shakha: 'admin_planning',
+    assignedShakha: assignedShakhaName, assignedShakhaCode: assignedShakha, assignedDate: assignedDate || '', status,
+    remarks: remarks || '', shakha: assignedShakhaName,
     mahashakha: MAHASHAKHA.ADMIN_MONITORING, source: 'hello_sarkar',
     createdBy: state.currentUser.name, createdAt: new Date().toISOString()
   };
@@ -6320,7 +6859,10 @@ function assignToShakha(id) {
   const formContent = `
     <div class="d-grid gap-3">
       <div class="form-group"><label class="form-label">उजुरी नं</label><input type="text" class="form-control" value="${complaint.id}" readonly /></div>
-      <div class="form-group"><label class="form-label">शाखा *</label><select class="form-select" id="assignShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => `<option value="${key}" ${complaint.assignedShakha === key ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">शाखा *</label><select class="form-select" id="assignShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => {
+        const isSelected = (complaint.assignedShakha === key) || (complaint.assignedShakha === value);
+        return `<option value="${key}" ${isSelected ? 'selected' : ''}>${value}</option>`;
+      }).join('')}</select></div>
       <div class="form-group"><label class="form-label">पठाएको मिति *</label>
         <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="assignDate">
           <select id="assignDate_year" class="form-select bs-year"><option value="">साल</option></select>
@@ -6359,6 +6901,9 @@ async function saveShakhaAssignment(id) {
   const updateData = {
     id: id,
     assignedShakha: assignedShakhaName,
+    // Also set the main 'shakha' field so sheet columns like 'सम्बन्धित शाखा' get updated
+    shakha: assignedShakhaName,
+    assignedShakhaCode: assignedShakhaCode,
     assignedDate: assignDate,
     instructions: instructions || '',
     status: 'progress',
@@ -6431,6 +6976,7 @@ function showTechnicalProjectsView() {
   `;
   
   document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
   updateActiveNavItem();
 }
 
@@ -6613,6 +7159,7 @@ function showEmployeeMonitoringView() {
   `;
   
   document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
   updateActiveNavItem();
   setTimeout(()=>{ initializeDatepickers(); initializeNepaliDropdowns(); }, 100);
 }
@@ -6654,11 +7201,11 @@ function showNewEmployeeMonitoring() {
 }
 
 async function saveEmployeeMonitoring() {
-  const date = document.getElementById('empDate').value;
+  const date = _latinToDevnagari(document.getElementById('empDate').value);
   const organization = document.getElementById('empOrganization').value;
   const uniformViolation = document.getElementById('empUniformViolation').value || '०';
   const timeViolation = document.getElementById('empTimeViolation').value || '०';
-  const instructionDate = document.getElementById('empInstructionDate').value || '';
+  const instructionDate = _latinToDevnagari(document.getElementById('empInstructionDate').value || '');
   const remarks = document.getElementById('empRemarks').value || '';
   
   if (!date || !organization) {
@@ -6691,7 +7238,7 @@ async function saveEmployeeMonitoring() {
 }
 
 function viewEmployeeMonitoring(id) {
-  const record = state.employeeMonitoring.find(r => r.id === id);
+  const record = state.employeeMonitoring.find(r => String(r.id) === String(id));
   if (!record) { showToast('अभिलेख फेला परेन', 'error'); return; }
   
   const content = `
@@ -6713,7 +7260,7 @@ function viewEmployeeMonitoring(id) {
 }
 
 function editEmployeeMonitoring(id) {
-  const record = state.employeeMonitoring.find(r => r.id === id);
+  const record = state.employeeMonitoring.find(r => String(r.id) === String(id));
   if (!record) return;
   
   const formContent = `
@@ -6751,16 +7298,16 @@ function editEmployeeMonitoring(id) {
 }
 
 function saveEmployeeMonitoringEdit(id) {
-  const recordIndex = state.employeeMonitoring.findIndex(r => r.id === id);
+  const recordIndex = state.employeeMonitoring.findIndex(r => String(r.id) === String(id));
   if (recordIndex === -1) return;
   
   const updatedRecord = {
     ...state.employeeMonitoring[recordIndex],
-    date: document.getElementById('editEmpDate').value,
+    date: _latinToDevnagari(document.getElementById('editEmpDate').value),
     organization: document.getElementById('editEmpOrganization').value,
     uniformViolation: document.getElementById('editEmpUniformViolation').value || '०',
     timeViolation: document.getElementById('editEmpTimeViolation').value || '०',
-    instructionDate: document.getElementById('editEmpInstructionDate').value || '',
+    instructionDate: _latinToDevnagari(document.getElementById('editEmpInstructionDate').value || ''),
     remarks: document.getElementById('editEmpRemarks').value || '',
     updatedAt: new Date().toISOString(),
     updatedBy: state.currentUser.name
@@ -6825,6 +7372,7 @@ function showCitizenCharterView() {
   `;
   
   document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
   updateActiveNavItem();
 }
 
@@ -6863,11 +7411,11 @@ function showNewCitizenCharter() {
 }
 
 async function saveCitizenCharter() {
-  const date = document.getElementById('ccDate').value;
+  const date = _latinToDevnagari(document.getElementById('ccDate').value);
   const organization = document.getElementById('ccOrganization').value;
   const findings = document.getElementById('ccFindings').value;
   const instructions = document.getElementById('ccInstructions').value;
-  const instructionDate = document.getElementById('ccInstructionDate').value || '';
+  const instructionDate = _latinToDevnagari(document.getElementById('ccInstructionDate').value || '');
   const remarks = document.getElementById('ccRemarks').value || '';
   
   if (!date || !organization || !findings || !instructions) {
@@ -6899,7 +7447,7 @@ async function saveCitizenCharter() {
 }
 
 function viewCitizenCharter(id) {
-  const record = state.citizenCharters.find(r => r.id === id);
+  const record = state.citizenCharters.find(r => String(r.id) === String(id));
   if (!record) { showToast('अभिलेख फेला परेन', 'error'); return; }
   
   const content = `
@@ -6919,7 +7467,7 @@ function viewCitizenCharter(id) {
 }
 
 function editCitizenCharter(id) {
-  const record = state.citizenCharters.find(r => r.id === id);
+  const record = state.citizenCharters.find(r => String(r.id) === String(id));
   if (!record) return;
   
   const formContent = `
@@ -6955,16 +7503,16 @@ function editCitizenCharter(id) {
 }
 
 function saveCitizenCharterEdit(id) {
-  const recordIndex = state.citizenCharters.findIndex(r => r.id === id);
+  const recordIndex = state.citizenCharters.findIndex(r => String(r.id) === String(id));
   if (recordIndex === -1) return;
   
   const updatedRecord = {
     ...state.citizenCharters[recordIndex],
-    date: document.getElementById('editCcDate').value,
+    date: _latinToDevnagari(document.getElementById('editCcDate').value),
     organization: document.getElementById('editCcOrganization').value,
     findings: document.getElementById('editCcFindings').value,
     instructions: document.getElementById('editCcInstructions').value,
-    instructionDate: document.getElementById('editCcInstructionDate').value || '',
+    instructionDate: _latinToDevnagari(document.getElementById('editCcInstructionDate').value || ''),
     remarks: document.getElementById('editCcRemarks').value || '',
     updatedAt: new Date().toISOString(),
     updatedBy: state.currentUser.name
@@ -7694,7 +8242,7 @@ function viewComplaint(id) {
       ${complaint.finalDecision ? `
         <div>
           <div class="text-small text-muted">अन्तिम निर्णयको प्रकार</div>
-          <div class="card p-3 bg-light">${FINAL_DECISION_TYPES[complaint.finalDecision] || complaint.finalDecision}</div>
+          <div class="card p-3 bg-light">${normalizeFinalDecisionType(complaint.finalDecision)}</div>
         </div>
       ` : ''}
 
@@ -7815,7 +8363,7 @@ function editComplaint(id) {
       <div class="form-group"><label class="form-label">कैफियत</label><input type="text" class="form-control" value="${complaint.remarks || ''}" id="editRemarks" /></div>
       <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="editStatus"><option value="pending" ${complaint.status === 'pending' ? 'selected' : ''}>काम बाँकी</option><option value="progress" ${complaint.status === 'progress' ? 'selected' : ''}>चालु</option><option value="resolved" ${complaint.status === 'resolved' ? 'selected' : ''}>फछ्रयौट</option></select></div>
       
-      <div class="form-group"><label class="form-label">अन्तिम निर्णयको प्रकार</label><select class="form-select" id="editFinalDecision"><option value="">छान्नुहोस्</option>${Object.entries(FINAL_DECISION_TYPES).map(([key, value]) => `<option value="${key}" ${String(complaint.finalDecision) === String(key) || complaint.finalDecision === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">अन्तिम निर्णयको प्रकार</label><select class="form-select" id="editFinalDecision"><option value="">छान्नुहोस्</option>${['तामेली','सुझाव/निर्देशन','सतर्क','अन्य'].map(label => `<option value="${label}" ${normalizeFinalDecisionType(complaint.finalDecision) === label ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
 
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveEditedComplaint('${id}')">सुरक्षित गर्नुहोस्</button></div>
@@ -7865,7 +8413,7 @@ function deleteComplaint(id) {
 function filterComplaintsTable() {
   // Use unified rendering via showComplaintsView to respect pagination and sorting.
   const status = document.getElementById('filterStatus')?.value || '';
-  const priority = document.getElementById('filterPriority')?.value || '';
+  const finalDecisionType = document.getElementById('filterFinalDecisionType')?.value || '';
   const shakha = document.getElementById('filterShakha')?.value || '';
   const searchField = document.getElementById('searchField')?.value || 'all';
   const searchText = (document.getElementById('searchText')?.value || '').toLowerCase();
@@ -7878,7 +8426,7 @@ function filterComplaintsTable() {
   
   showComplaintsView({ 
       status, 
-      priority, 
+      finalDecisionType, 
       shakha, 
       searchField, 
       search: searchText, 
@@ -7892,7 +8440,7 @@ function filterComplaintsTable() {
 function saveComplaintsFilters() {
     const filters = {
         status: document.getElementById('filterStatus')?.value || '',
-        priority: document.getElementById('filterPriority')?.value || '',
+        finalDecisionType: document.getElementById('filterFinalDecisionType')?.value || '',
         shakha: document.getElementById('filterShakha')?.value || '',
         searchField: document.getElementById('searchField')?.value || 'all',
         search: document.getElementById('searchText')?.value || '',
@@ -7970,7 +8518,7 @@ function filterAdminComplaints() {
       <tr>
         <td data-label="क्र.सं.">${index + 1}</td><td data-label="मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
         <td data-label="उजुरीको विवरण" class="text-limit" title="${complaint.description}">${complaint.description.substring(0, 50)}...</td>
-        <td data-label="सम्बन्धित शाखा">${complaint.assignedShakha || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
+                  <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha) || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
         <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.substring(0, 30) + '...' : '-'}</td>
         <td data-label="कैफियत">${complaint.remarks || '-'}</td>
         <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button></div></td>
@@ -8267,7 +8815,70 @@ async function initializeApp() {
         console.log(`✅ Loaded and formatted ${state.complaints.length} complaints from localStorage`);
       }
     }
-    // Load other data from localStorage...
+
+    const savedEmployeeMonitoring = localStorage.getItem('nvc_employee_monitoring_backup');
+    if (savedEmployeeMonitoring) {
+      const parsed = JSON.parse(savedEmployeeMonitoring);
+      if (Array.isArray(parsed)) {
+        state.employeeMonitoring = parsed.map(r => {
+          if (!r) return null;
+          return {
+            ...r,
+            id: String(r.id || ''),
+            date: String(r.date || ''),
+            organization: String(r.organization || ''),
+            uniformViolation: String(r.uniformViolation || ''),
+            timeViolation: String(r.timeViolation || ''),
+            instructionDate: String(r.instructionDate || ''),
+            remarks: String(r.remarks || '')
+          };
+        }).filter(Boolean);
+      }
+    }
+
+    const savedCitizenCharters = localStorage.getItem('nvc_citizen_charters_backup');
+    if (savedCitizenCharters) {
+      const parsed = JSON.parse(savedCitizenCharters);
+      if (Array.isArray(parsed)) {
+        state.citizenCharters = parsed.map(r => {
+          if (!r) return null;
+          return {
+            ...r,
+            id: String(r.id || ''),
+            date: String(r.date || ''),
+            organization: String(r.organization || ''),
+            findings: String(r.findings || ''),
+            instructions: String(r.instructions || ''),
+            instructionDate: String(r.instructionDate || ''),
+            remarks: String(r.remarks || '')
+          };
+        }).filter(Boolean);
+      }
+    }
+
+    const savedProjects = localStorage.getItem('nvc_projects_backup');
+    if (savedProjects) {
+      const parsed = JSON.parse(savedProjects);
+      if (Array.isArray(parsed)) {
+        state.projects = parsed.map(p => {
+          if (!p) return null;
+          return {
+            ...p,
+            id: String(p.id || ''),
+            name: String(p.name || ''),
+            organization: String(p.organization || ''),
+            inspectionDate: String(p.inspectionDate || ''),
+            nonCompliances: String(p.nonCompliances || ''),
+            improvementLetterDate: String(p.improvementLetterDate || ''),
+            improvementInfo: String(p.improvementInfo || ''),
+            status: String(p.status || 'pending'),
+            remarks: String(p.remarks || ''),
+            shakha: String(p.shakha || '')
+          };
+        }).filter(Boolean);
+        console.log(`✅ Loaded ${state.projects.length} projects from localStorage`);
+      }
+    }
   } catch (e) {
     console.warn('⚠️ Error loading from localStorage:', e);
   }
@@ -8495,10 +9106,9 @@ const DISTRICT_COORDINATES = {
 function generateHotspotCards() {
     const districtCounts = {};
     (state.complaints || []).forEach(c => {
-        const dist = c.district || 'अन्य';
-        if (dist !== 'अन्य') {
-            districtCounts[dist] = (districtCounts[dist] || 0) + 1;
-        }
+        const dist = c.district;
+        if (!dist) return;
+        districtCounts[dist] = (districtCounts[dist] || 0) + 1;
     });
 
     const sortedDistricts = Object.entries(districtCounts)
@@ -8522,6 +9132,133 @@ function generateHotspotCards() {
     `).join('');
 }
 
+function _getProvinceForDistrict(district) {
+    if (!district) return '';
+    const d = String(district).trim().replace(/\s+/g, ' ');
+    const entries = Object.entries(LOCATION_FIELDS.DISTRICTS || {});
+    for (const [provinceKey, districts] of entries) {
+        if (Array.isArray(districts) && districts.map(x => String(x).trim().replace(/\s+/g, ' ')).includes(d)) {
+            return LOCATION_FIELDS.PROVINCE?.[provinceKey] || '';
+        }
+    }
+    return '';
+}
+
+function _getComplaintProvince(complaint) {
+    if (!complaint) return '';
+    const raw = complaint.province;
+    const normalizedRaw = raw === 0 || raw ? String(raw).trim() : '';
+    if (/^[1-7]$/.test(normalizedRaw)) {
+        return LOCATION_FIELDS.PROVINCE?.[normalizedRaw] || '';
+    }
+    const byRaw = _normalizeProvinceName(normalizedRaw);
+    if (byRaw) return byRaw;
+    const byDistrict = _getProvinceForDistrict(complaint.district) || '';
+    return _normalizeProvinceName(byDistrict) || byDistrict;
+}
+
+function _normalizeProvinceName(value) {
+    if (!value) return '';
+    const v = String(value)
+        .replace(/^[0-9०-९]+\s*\/\s*/g, '')
+        .trim()
+        .replace(/\s+/g, ' ');
+
+    const provinces = Object.values(LOCATION_FIELDS.PROVINCE || {});
+    if (provinces.includes(v)) return v;
+    if (v.endsWith(' प्रदेश') && provinces.includes(v)) return v;
+
+    if (/कोशी/.test(v)) return LOCATION_FIELDS.PROVINCE?.['1'] || 'कोशी प्रदेश';
+    if (/मधेश/.test(v)) return LOCATION_FIELDS.PROVINCE?.['2'] || 'मधेश प्रदेश';
+    if (/बागमती/.test(v)) return LOCATION_FIELDS.PROVINCE?.['3'] || 'बागमती प्रदेश';
+    if (/गण्डकी/.test(v)) return LOCATION_FIELDS.PROVINCE?.['4'] || 'गण्डकी प्रदेश';
+    if (/लुम्बिनी/.test(v)) return LOCATION_FIELDS.PROVINCE?.['5'] || 'लुम्बिनी प्रदेश';
+    if (/कर्णाली/.test(v)) return LOCATION_FIELDS.PROVINCE?.['6'] || 'कर्णाली प्रदेश';
+    if (/सुदूरपश्चिम/.test(v)) return LOCATION_FIELDS.PROVINCE?.['7'] || 'सुदूरपश्चिम प्रदेश';
+
+    return '';
+}
+
+function _updateHotspotMapCount(count) {
+    const el = document.getElementById('mapFilteredCount');
+    if (!el) return;
+    el.textContent = String(count ?? 0);
+    applyDevanagariDigits(el);
+}
+
+function _clearHotspotMapLayers() {
+    if (!window.nvcMap || !Array.isArray(window.nvcMapLayers)) return;
+    window.nvcMapLayers.forEach(layer => {
+        try { window.nvcMap.removeLayer(layer); } catch (e) {}
+    });
+    window.nvcMapLayers = [];
+}
+
+function _renderHotspotMapMarkers({ map, complaints, focusDistrict = null }) {
+    const districtCounts = {};
+    (complaints || []).forEach(c => {
+        const dist = c.district;
+        if (!dist) return;
+        districtCounts[dist] = (districtCounts[dist] || 0) + 1;
+    });
+
+    Object.entries(districtCounts).forEach(([dist, count]) => {
+        const coords = DISTRICT_COORDINATES[dist];
+        if (!coords) return;
+
+        const isHotspot = count > 5;
+        const isCritical = count > 10;
+        let marker;
+
+        const clickHandler = () => {
+            const districtComplaints = (complaints || []).filter(c => c.district === dist);
+            let content = `<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>दर्ता नं</th><th>मिति</th><th>विवरण</th><th>स्थिति</th></tr></thead><tbody>`;
+
+            if (districtComplaints.length === 0) {
+                content += `<tr><td colspan="4" class="text-center">उजुरी छैन</td></tr>`;
+            } else {
+                districtComplaints.forEach(c => {
+                    const statusText = c.status === 'resolved' ? 'फछ्रयौट' : c.status === 'progress' ? 'चालु' : 'बाँकी';
+                    const statusClass = c.status === 'resolved' ? 'text-success' : c.status === 'progress' ? 'text-primary' : 'text-warning';
+                    content += `<tr>
+                       <td>${c.id}</td>
+                       <td>${c.date}</td>
+                       <td>${(c.description || '').substring(0, 40)}...</td>
+                       <td class="${statusClass}">${statusText}</td>
+                    </tr>`;
+                });
+            }
+
+            content += `</tbody></table></div>`;
+            openModal(`${dist} जिल्लाका उजुरीहरू`, content);
+        };
+
+        if (isHotspot) {
+            const rippleColorClass = isCritical ? 'red' : 'yellow';
+            const size = isCritical ? 18 : 14;
+            const rippleIcon = L.divIcon({
+                className: `ripple-marker ${rippleColorClass}`,
+                iconSize: [size, size]
+            });
+            marker = L.marker(coords, { icon: rippleIcon }).addTo(map);
+        } else {
+            const radius = Math.min(30, 8 + count * 1.5);
+            const color = '#1976d2';
+            marker = L.circleMarker(coords, { radius: radius, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.7 }).addTo(map);
+        }
+
+        window.nvcMapLayers = window.nvcMapLayers || [];
+        window.nvcMapLayers.push(marker);
+
+        marker.bindTooltip(`<strong>${dist}</strong><br>उजुरी संख्या: ${count}`, { direction: 'top' });
+        marker.on('click', clickHandler);
+    });
+
+    if (focusDistrict && DISTRICT_COORDINATES[focusDistrict]) {
+        map.setView(DISTRICT_COORDINATES[focusDistrict], 10);
+    }
+}
+
 function showHotspotMap(focusDistrict = null) {
     state.currentView = 'hotspot_map';
     document.getElementById('pageTitle').textContent = 'हटस्पट नक्सा';
@@ -8529,7 +9266,10 @@ function showHotspotMap(focusDistrict = null) {
     const content = `
         <div class="card h-100">
             <div class="card-header d-flex justify-between align-center">
-                <h5 class="mb-0">उजुरीको भौगोलिक वितरण</h5>
+                <div class="d-flex align-center gap-3">
+                    <h5 class="mb-0">उजुरीको भौगोलिक वितरण</h5>
+                    <span class="text-small text-muted">Filtered: <strong id="mapFilteredCount">०</strong></span>
+                </div>
                 <div class="d-flex gap-2">
                     <select class="form-select form-select-sm" id="mapFilterProvince" onchange="updateMapFilter()">
                         <option value="">सबै प्रदेश</option>
@@ -8544,7 +9284,16 @@ function showHotspotMap(focusDistrict = null) {
     `;
     
     document.getElementById('contentArea').innerHTML = content;
+    applyDevanagariDigits(document.getElementById('contentArea'));
     updateActiveNavItem();
+
+    if (focusDistrict) {
+        const provinceForFocus = _getProvinceForDistrict(focusDistrict);
+        const select = document.getElementById('mapFilterProvince');
+        if (select && provinceForFocus) {
+            select.value = provinceForFocus;
+        }
+    }
 
     setTimeout(() => {
         if (typeof L === 'undefined') {
@@ -8552,63 +9301,33 @@ function showHotspotMap(focusDistrict = null) {
             return;
         }
         if (window.nvcMap) { window.nvcMap.remove(); window.nvcMap = null; }
+        window.nvcMapLayers = [];
         const map = L.map('hotspotMap').setView([28.3949, 84.1240], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-        const districtCounts = {};
-        (state.complaints || []).forEach(c => { const dist = c.district; if (dist) districtCounts[dist] = (districtCounts[dist] || 0) + 1; });
-        Object.entries(districtCounts).forEach(([dist, count]) => {
-            const coords = DISTRICT_COORDINATES[dist];
-            if (coords) {
-                const isHotspot = count > 5;
-                const isCritical = count > 10;
-                let marker;
 
-                const clickHandler = () => {
-                     const districtComplaints = (state.complaints || []).filter(c => c.district === dist);
-                     let content = `<div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>दर्ता नं</th><th>मिति</th><th>विवरण</th><th>स्थिति</th></tr></thead><tbody>`;
-                     
-                     if(districtComplaints.length === 0) {
-                         content += `<tr><td colspan="4" class="text-center">उजुरी छैन</td></tr>`;
-                     } else {
-                         districtComplaints.forEach(c => {
-                             const statusText = c.status === 'resolved' ? 'फछ्रयौट' : c.status === 'progress' ? 'चालु' : 'बाँकी';
-                             const statusClass = c.status === 'resolved' ? 'text-success' : c.status === 'progress' ? 'text-primary' : 'text-warning';
-                             content += `<tr>
-                                <td>${c.id}</td>
-                                <td>${c.date}</td>
-                                <td>${(c.description || '').substring(0, 40)}...</td>
-                                <td class="${statusClass}">${statusText}</td>
-                             </tr>`;
-                         });
-                     }
-                     content += `</tbody></table></div>`;
-                     openModal(`${dist} जिल्लाका उजुरीहरू`, content);
-                };
+        const provinceSelected = _normalizeProvinceName((document.getElementById('mapFilterProvince')?.value || '').trim());
+        const complaintsForMap = provinceSelected
+            ? (state.complaints || []).filter(c => _normalizeProvinceName(_getComplaintProvince(c)) === provinceSelected)
+            : (state.complaints || []);
 
-                if (isHotspot) {
-                    const rippleColorClass = isCritical ? 'red' : 'yellow';
-                    const size = isCritical ? 18 : 14;
-                    const rippleIcon = L.divIcon({
-                        className: `ripple-marker ${rippleColorClass}`,
-                        iconSize: [size, size]
-                    });
-                    marker = L.marker(coords, { icon: rippleIcon }).addTo(map);
-                } else {
-                    const radius = Math.min(30, 8 + count * 1.5);
-                    const color = '#1976d2';
-                    marker = L.circleMarker(coords, { radius: radius, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.7 }).addTo(map);
-                }
-                
-                marker.bindTooltip(`<strong>${dist}</strong><br>उजुरी संख्या: ${count}`, { direction: 'top' });
-                marker.on('click', clickHandler);
-            }
-        });
-        if (focusDistrict && DISTRICT_COORDINATES[focusDistrict]) { map.setView(DISTRICT_COORDINATES[focusDistrict], 10); }
+        _updateHotspotMapCount(complaintsForMap.length);
+
+        _renderHotspotMapMarkers({ map, complaints: complaintsForMap, focusDistrict });
         window.nvcMap = map;
     }, 300);
 }
 
-function updateMapFilter() { showToast('फिल्टर अपडेट गरियो', 'info'); }
+function updateMapFilter() {
+    if (!window.nvcMap) return;
+    const provinceSelected = _normalizeProvinceName((document.getElementById('mapFilterProvince')?.value || '').trim());
+    const complaintsForMap = provinceSelected
+        ? (state.complaints || []).filter(c => _normalizeProvinceName(_getComplaintProvince(c)) === provinceSelected)
+        : (state.complaints || []);
+
+    _clearHotspotMapLayers();
+    _updateHotspotMapCount(complaintsForMap.length);
+    _renderHotspotMapMarkers({ map: window.nvcMap, complaints: complaintsForMap });
+}
 function monitorHotspotAlerts() { /* Alert logic */ }
 function loadDistricts() {
     const provinceSelect = document.getElementById('complaintProvince');
