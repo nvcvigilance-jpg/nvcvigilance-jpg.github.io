@@ -1,21 +1,68 @@
 
+    const NVC = (function () {
+      if (typeof window === 'undefined') return {};
+      if (!window.NVC) window.NVC = {};
+      return window.NVC;
+    })();
+
+    NVC.Config = NVC.Config || {};
+    NVC.State = NVC.State || {};
+    NVC.Api = NVC.Api || {};
+    NVC.UI = NVC.UI || {};
+    NVC.Chatbot = NVC.Chatbot || {};
+    NVC.Utils = NVC.Utils || {};
+
     // ==================== GOOGLE SHEETS CONFIGURATION ====================
-const GOOGLE_SHEETS_CONFIG = {
-  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzCto7O7ffF-D-nHi_h3NNjEAjYPTn9TO1ruJjNZZNZdch_Aq0BLQpgAM-wYP_P9VYQ8g/exec',
+const GOOGLE_SHEETS_CONFIG = (NVC.Config.GOOGLE_SHEETS_CONFIG = {
+  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbw9PfOM-2RbNLKAbnPXdgfBKxZAV8dbl8mEaFH8V12sPV5EBf5T7kGs9HBhlAPyMTfUoQ/exec',
   API_KEY: 'nvc2026secretkey',
   ENABLED: true,
   USE_CORS_PROXY: false,
 
-  MAX_RETRIES: 3,
+  MAX_RETRIES: 2,
   RETRY_DELAY: 1000,
-  TIMEOUT: 30000
-};
+  TIMEOUT: 15000
+});
 
 // UI theme (light/dark) default
 var currentTheme = 'light';
 
+// List of Ministries, Constitutional Bodies and Provinces for Ministry/Agency dropdown (global)
+const MINISTRIES = (NVC.Config.MINISTRIES = [
+  "प्रधानमन्त्री तथा मन्त्रिपरिषद्को कार्यालय",
+  "अर्थ मन्त्रालय",
+  "उद्योग, वाणिज्य तथा आपूर्ति मन्त्रालय",
+  "ऊर्जा, जलस्रोत तथा सिंचाइ मन्त्रालय",
+  "कानून, न्याय तथा संसदीय मामिला मन्त्रालय",
+  "कृषि तथा पशुपन्छी विकास मन्त्रालय",
+  "खानेपानी मन्त्रालय",
+  "गृह मन्त्रालय",
+  "परराष्ट्र मन्त्रालय",
+  "भूमि व्यवस्था, सहकारी तथा गरिबी निवारण मन्त्रालय",
+  "भौतिक पूर्वाधार तथा यातायात मन्त्रालय",
+  "महिला, बालबालिका तथा ज्येष्ठ नागरिक मन्त्रालय",
+  "युवा तथा खेलकुद मन्त्रालय",
+  "रक्षा मन्त्रालय",
+  "वन तथा वातावरण मन्त्रालय",
+  "सङ्घीय मामिला तथा सामान्य प्रशासन मन्त्रालय",
+  "सञ्चार तथा सूचना प्रविधि मन्त्रालय",
+  "सहरी विकास मन्त्रालय",
+  "स्वास्थ्य तथा जनसङ्ख्या मन्त्रालय",
+  "संस्कृति, पर्यटन तथा नागरिक उड्डयन मन्त्रालय",
+  "शिक्षा, विज्ञान तथा प्रविधि मन्त्रालय",
+  "श्रम, रोजगार तथा सामाजिक सुरक्षा मन्त्रालय",
+  "संवैधानिक अङ्ग",
+  "कोशी प्रदेश",
+  "मधेस प्रदेश",
+  "बागमती प्रदेश",
+  "गण्डकी प्रदेश",
+  "लुम्बिनी प्रदेश",
+  "कर्णाली प्रदेश",
+  "सुदूर पश्चिम प्रदेश"
+]);
+
 // ==================== AI SYSTEM CONFIGURATION ====================
-const AI_SYSTEM = {
+const AI_SYSTEM = (NVC.Chatbot.AI_SYSTEM = {
   keywords: {
     high: ['तुरुन्त', 'अति', 'गम्भीर', 'भ्रष्टाचार', 'घूस', 'ज्यान', 'जोखिम', 'urgent', 'corruption', 'करोड'],
     medium: ['समस्या', 'ढिला', 'अनियमितता', 'गुनासो', 'delay', 'लापरवाही'],
@@ -90,11 +137,28 @@ const AI_SYSTEM = {
     // 6. Summary Generation
     const cleanText = description.replace(/\s+/g, ' ').trim();
     // Split by common sentence terminators (Nepali & English)
-    const sentences = cleanText.split(/[।?!.]/);
-    let summary = sentences[0].trim();
-    if (summary.length > 80) summary = summary.substring(0, 77) + '...';
-    else if (sentences.length > 1 && sentences[1].trim()) summary += '...';
+    const sentences = cleanText.split(/[।?!.]/).filter(s => s.trim().length > 10);
+    let summary = '';
 
+    if (sentences.length > 0) {
+        let bestSentence = sentences[0];
+        let maxScore = 0;
+
+        // Find the sentence with the most important keywords
+        sentences.forEach(sentence => {
+            let sentenceScore = 0;
+            const sLower = sentence.toLowerCase();
+            this.keywords.high.forEach(k => { if (sLower.includes(k)) sentenceScore += 3; });
+            this.keywords.medium.forEach(k => { if (sLower.includes(k)) sentenceScore += 1; });
+            if (sentenceScore > maxScore) {
+                maxScore = sentenceScore;
+                bestSentence = sentence;
+            }
+        });
+        summary = bestSentence.trim();
+        if (summary.length > 80) summary = summary.substring(0, 77) + '...';
+        else if (sentences.length > 1) summary += '...';
+    }
     return { priority, category, classification, summary, sentiment, entities, score };
   },
 
@@ -151,15 +215,18 @@ const AI_SYSTEM = {
     
     // 3. सहयोग (Help)
     if (input.match(/(help|सहयोग|ke garna|what can|menu|options|list|k garna|sakchau|madat)/)) {
-        return `
-        <strong>म निम्न कुरामा सहयोग गर्न सक्छु:</strong><br>
-        - 📊 <em>तथ्याङ्क:</em> "कुल उजुरी", "फछ्रयौट संख्या"<br>
-        - 🔍 <em>खोज:</em> "उजुरी नं [ID] को अवस्था"<br>
-        - 📝 <em>प्रक्रिया:</em> "उजुरी स्थिति?"<br>
-        - 🏗️ <em>आयोजना:</em> "प्राविधिक परीक्षण", "आयोजना स्थिति"<br>
-        - 👮 <em>अनुगमन:</em> "कार्यालय अनुगमन", "पोशाक अनुगमन"<br>
-        - 📞 <em>सम्पर्क:</em> "सम्पर्क विवरण", "ठेगाना"
-        `;
+      return `
+      <strong>तपाईं निम्न बटनहरू थिचेर वा प्रश्न लेखेर सोध्न सक्नुहुन्छ:</strong><br>
+      <div class="chatbot-options" style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+        <button class="btn btn-sm btn-light border" onclick="document.getElementById('chatInput').value='कुल उजुरी कति छन्?'; sendChatMessage();">📊 कुल उजुरी</button>
+        <button class="btn btn-sm btn-light border" onclick="document.getElementById('chatInput').value='फछर्यौट भएका उजुरी'; sendChatMessage();">✅ फछर्यौट भएका</button>
+        <button class="btn btn-sm btn-light border" onclick="document.getElementById('chatInput').value='बाँकी उजुरी'; sendChatMessage();">🕒 बाँकी उजुरी</button>
+        <button class="btn btn-sm btn-light border" onclick="document.getElementById('chatInput').value='आयोजनाको स्थिति'; sendChatMessage();">🏗️ आयोजना स्थिति</button>
+        <button class="btn btn-sm btn-light border" onclick="document.getElementById('chatInput').value='कार्यालय अनुगमन'; sendChatMessage();">👮 कार्यालय अनुगमन</button>
+        <button class="btn btn-sm btn-light border" onclick="document.getElementById('chatInput').value='सम्पर्क ठेगाना'; sendChatMessage();">📞 सम्पर्क ठेगाना</button>
+      </div>
+      <small class="text-muted mt-2 d-block">अथवा "उजुरी नं NVC-2024-1234 को अवस्था के छ?" जस्ता प्रश्न सोध्नुहोस्।</small>
+      `;
     }
 
     // 4. तथ्याङ्क (Stats)
@@ -367,7 +434,7 @@ const AI_SYSTEM = {
 
     // Default Response (Randomized)
     const defaults = [
-        'माफ गर्नुहोला, मैले बुझिन। कृपया अलि स्पष्टसँग सोध्नुहोस्।',
+        'माफ गर्नुहोला, मैले बुझिन। कृपया अलि स्पष्टसँग सोध्नुहोस्।',    
         'माफ गर्नुहोला, हाम्रो केन्द्रमा सनरुफ भएको गाडी छैन। सचिवज्यूको लागि एउटा फर्चुनर गाडी खोज्दै छौं।',
         'मैले प्रश्न बुझ्न सकिन। तपाईं "help" टाइप गरेर उदाहरण हेर्न सक्नुहुन्छ।',
         'क्षमा पाउँ, म अझै सिक्दै छु। तपाईंले उजुरी, आयोजना वा सम्पर्कबारे सोध्न सक्नुहुन्छ।',
@@ -413,7 +480,7 @@ const AI_SYSTEM = {
     
     return 'COMPLAINT_MANAGEMENT';
   }
-};
+});
 
 function normalizeProvinceName(value) {
   if (value === undefined || value === null) return '';
@@ -643,20 +710,115 @@ const LOCATION_FIELDS = {
     7: ['बाजुरा', 'बझाङ', 'डोटी', 'अछाम', 'दार्चुला', 'बैतडी', 'डडेल्धुरा', 'कञ्चनपुर', 'कैलाली']
   },
   MUNICIPALITIES: {
-    // प्रमुख नगरपालिकाहरू
+    // Populate local levels for provinces using provided lists.
+    1: {
+      "भोजपुर": ["आमचोक","अरुण","भोजपुर","हतुवागढी","पौवाडुङ्मा","रामप्रसाद","सालपसिलिछो","षडानन्द","टेम्केमाइयुङ"],
+      "धनकुटा": ["चौबिसे","छथर जोरपाटी","धनकुटा","महालक्ष्मी","पाखरिबास","साँगुरीगढी","शहिदभूमि"],
+      "इलाम": ["चुलाचुली","देउमाई","फाकफोक्थुम","इलाम","माई","माइजोगमाई","मङ्गेबुङ","रोङ","सन्दकपुर","सूर्योदय"],
+      "झापा": ["अर्जुनधारा","बाह्रदशी","भद्रपुर","बिर्तामोड","बुद्धशान्ति","दमक","गौराधा","गौरीगञ्ज","हल्दिबारी","झापा","कचनकवल","कमल","कनकाई","मेचीनगर","शिवसताक्सी"],
+      "खोटाङ": ["ऐसेलुखर्क","बराहापोखरी","दिक्तेल रुपाकोट मझुवागढी","डिप्रुङ","हलेसी तुवाचुङ","जानतेढुङ्गा","केपिलासगढी","खोटेहाङ","रवा बेसी","साकेला"],
+      "मोरङ": ["बेलबारी","विराटनगर","बुढीगंगा","धनपालथान","ग्रामथान","जहादा","कानेपोखरी","कटहरी","केराबारी","लेटाङ","मिक्लाजुङ","पथरी शनिश्चरे","रंगेली","रतुवामाई","सुन्दरहरैचा","सुनवर्शी","उरालाबारी"],
+      "ओखलढुङ्गा": ["चम्पादेवी","चिसंखुगढी","खिजिदेम्बा","लिखु","मानेभञ्ज्याङ","मोलुङ","सिद्धिचरण","सुनकोशी"],
+      "पाँचथर": ["फालेलुङ","फाल्गुनन्द","हिलिहाङ","कुमायक","मिक्लाजुङ","फिदिम","तुम्बेवा","याङ्गवारक"],
+      "संखुवासभा": ["भोटखोला","चैनपुर","चिचिला","धर्मदेवी","खाँदबारी","माडी","मकालु","पञ्चखापन","सभापोखरी","सिलिचङ"],
+      "सोलुखुम्बु": ["खुम्बुपसङ्लाहमु","लिखुपिके","माप्या दुधकोशी","महाकुलुङ","नेचासल्यान","सोलुदुधाकुण्ड","सोटाङ","थुलुङ दुधकोशी"],
+      "तेह्रथुम": ["आठराई","छथर","लालीगुराँस","मेन्चायम","म्याङलुङ","फेडाप"],
+      "सुनसरी": ["बराहक्षेत्र","बर्जु","भोक्राहा नरसिङ्ग","देवानगन्ज","धरान","दुहबी","गढी","हरिनगर","इनरुवा","इटहरी","कोशी","रामधुनी"],
+      "उदयपुर": ["बेलका","चौदण्डीगढी","कटारी","लिम्चुङबुङ","रौतामाई","तापली","त्रियुग","उदयपुरगढी"]
+    },
+    2: {
+      "सप्तरी": ["अग्निशैर कृष्ण सावरण","बालन बिहुल","विष्णुपुर","बोडे बार्सैन","छिन्नमस्ता","डाक्नेश्वरी","हनुमाननगर कंकालिनी","कञ्चनरुप","खडक","महादेव","राजविराज","राजगढ","रुपानी","सप्तकोशी","शम्भुनाथ","सुरुङ्गा","तिलाठी कोइलाडी","तिराहुत"],
+      "सिराहा": ["अर्नामा","औरही","बरियारपट्टी","भगवानपुर","विष्णुपुर","धनगढीमाई","गोलबजार","कल्याणपुर","कर्जन्हा","लहान","लक्ष्मीपुर पटारी","मिर्चैया","नरहा","नवराजपुर","सखुवानङ्करकट्टी","सिरहा","सुखीपुर"],
+      "धनुषा": ["औराही","बटेश्वर","बिदेहा","क्षिरेश्वरनाथ","धनौजी","धनुषाधाम","गणेशमान चारनाथ","हंसपुर","जनकनन्दनी","जनकपुरधाम","कमला","लक्ष्मीनिया","मिथिला","मिथिला बिहारी","मुखियापट्टी मुसरमिया","नगराई","सबाइला","सहिदनगर"],
+      "महोत्तरी": ["औरही","बलवा","बर्दिवास","भङ्गाहा","एकडानरा","गौशाला","जलेश्वर","लोहारपट्टी","महोत्तरी","मनरा सिसवा","मटिहानी","पिपरा","रामगोपालपुर","सम्सी","सोनामा"],
+      "सर्लाही": ["बागमती","बलरा","बराहथवा","बासबरिया","विष्णु","ब्रम्हपुरी","चक्रघट्टा","चन्द्रनगर","धनकौल","गोदैता","हरिपुर","हरिपुरवा","हरिवान","ईश्वरपुर","कबिलासी","कौडेना","लालबन्दी","मलङ्गवा","पर्सा","रामनगर"],
+      "बारा": ["आदर्श कोतवाल","बारागढी","बिश्रामपुर","देवтал","जितपुरसिमारा","कलैया","करैयामाई","कोल्हाबी","महागढीमाई","निजगढ","पचरौता","परवानीपुर","फेटा","प्रसौनी","सिम्रौनगढ","सुवर्ण"],
+      "पर्सा": ["बहुदरमाई","बिन्दवासिनी","वीरगन्ज","छिपहरमाई","धोबिनी","जगरनाथपुर","जिरभवानी","कालिकामाई","पकाहा मेनपुर","पर्सागढी","पटेरवा सुगौली","पोखरिया","सखुवा प्रसौनी","थोरी"],
+      "रौतहट": ["बौधिमाई","वृन्दबन","चन्द्रपुर","देवाही गोनाही","दुर्गा भगवती","गढीमाई","गरुड","गौर","गुजरा","ईशानाथ","कटहरिया","माधव नारायण","मौलापुर","पारोहा","विजयपुर फटुवा","राजदेवी","राजपुर","यमुनामाई"]
+    },
+    3: {
+      "भक्तपुर": ["भक्तपुर","चाँगुनारायण","मध्यपुरथिमि","सूर्यविनायक"],
+      "चितवन": ["भरतपुर","इच्छाकामना","कालिका","खैरहनी","माडी","राप्ती","रत्ननगर"],
+      "धादिङ": ["बेनिघाट रोराङ","धुनिबेसी","गजुरी","गाल्ची","गंगाजमुना","ज्वालामुखी","खनियाबास","नेत्रावती डब्जोङ","नीलकण्ठ","रुबी उपत्यका","सिद्धलेक","ठाकरे","त्रिपुरा सुन्दरी"],
+      "दोलखा": ["बैतेश्वर","भीमेश्वर","बिगु","गौरीशंकर","जिरी","कालिञ्चोक","मेलुङ","सेलुङ","तामाकोशी"],
+      "काठमाडौं": ["बुढानिलकण्ठ","चन्द्रागिरि","दक्षिणकाली","गोकर्णेश्वर","कागेश्वरी मनहोरा","काठमाडौं","कीर्तिपुर","नागार्जुन","शंखरापुर","तारकेश्वर","टोखा"],
+      "काभ्रेपलाञ्चोक": ["बनेपा","बेथानचोक","भुम्लु","चौरीदेउराली","धुलिखेल","खानीखोला","महाभारत","मण्डनदेउपुर","नमोबुद्ध","पनौती","पाँचखाल","रोशी","तेमल"],
+      "ललितपुर": ["बागमती","गोदावरी","कोन्ज्योसोम","ललितपुर","महालक्ष्मी","महांकाल"],
+      "मकवानपुर": ["बागमती","बकैया","भीमफेदी","हेटौंडा","इन्द्रसरोवर","कैलाश","मकवानपुरगढी","मनहरी","रक्सिराङ","थाहा"],
+      "नुवाकोट": ["बेलकोटगढी","बिदुर","दुप्चेश्वर","ककनी","किस्पाङ","लिखु","म्यागाङ","पञ्चकन्या","शिवपुरी","सुर्यगढी","ताडी","तारकेश्वर"],
+      "रामेछाप": ["दोरम्बा","गोकुलगंगा","खाडादेवी","लिखु तामाकोशी","मन्थली","रामेछाप","सुनापति","उमाकुण्ड"],
+      "रसुवा": ["अमाकोडिङमो","गोसाइकुण्ड","कालिका","नौकुण्ड","उत्तरगया"],
+      "सिन्धुली": ["दुधौली","घाङ्लेख","गोलन्जोर","हरिहरपुरगढी","कमलामाई","मारिन","फिक्कल","सुनकोशी","तिनपाटन"],
+      "सिन्धुपाल्चोक": ["बलेफी","बाह्रबिसे","भोटेकोशी","चौतारा साँगाचोकगढी","हेलम्बु","इन्द्रावती","जुगल","लिसाङ्खु","मेलम्ची","पाँचपोखरी थाङ्पाल","सुनकोशी","त्रिपुरासुन्दरी"]
+    },
+    4: {
+      "बाग्लुङ": ["बडिगाड","बाग्लुङ","बरेङ","ढोरपाटन","गलकोट","जैमुनी","कान्ठेखोला","निसिखोला","तमन खोला","तारा खोला"],
+      "गोरखा": ["आरुघाट","अजिरकोट","बारपाक सुलिकोट","भीमसेनथापा","चुम नुब्रि","धार्चे","गण्डकी","गोरखा","पालुङटार","सहिद लखन","सिरञ्चोक"],
+      "कास्की": ["अन्नपूर्ण","माछापुच्छ्रे","माडी","पोखरा","रुपा"],
+      "लमजुङ": ["बेशिशहर","दोर्दी","दूधपोखरी","क्वालासोथर","मध्यनेपाल","मर्स्याङ्दी","रैनास","सुन्दरबजार"],
+      "मनाङ": ["चामे","मनाङ इङ्स्याङ","नरपा भूमि","नरशोन"],
+      "मुस्ताङ": ["घरापझोङ","लो घेकर दामोदरकुण्ड","लोमान्थाङ","थासाङ","वारागुङ मुक्तिक्षेत्र"],
+      "म्याग्दी": ["अन्नपूर्ण","बेनी","धौलागिरी","मलिका","मंगला","रघुगंगा"],
+      "नवलपरासी पूर्व": ["बौदेकाली","बिनयी","बुलिङटार","देवचुली","गैडाकोट","हुप्सेकोट","कावासोती","मध्यविन्दु"],
+      "पर्वत": ["बिहादी","जलजला","कुश्मा","महाशिला","मोदी","पाइन्यु","फलेबास"],
+      "स्याङ्जा": ["आँधीखोला","अर्जुनचौपरी","भिरकोट","बिरुवा","चापाकोट","गल्याङ","हरिनास","कालीगण्डगी","फेदीखोला","पुतलीबजार","वालिङ"],
+      "तनहुँ": ["अन्बुखैरेनी","बन्दीपुर","भानु","भीमद","ब्यास","देवघाट","घिरिङ","म्याग्दे","रिसिङ","शुक्लागण्डकी"]
+    },
+    5: {
+      "अर्घाखाँची": ["भुमेकस्थान","छत्रदेव","मलारानी","पाणिनी","सन्धिखर्क","सितगंगा"],
+      "बाँके": ["बैजनाथ","डुडुवा","जानकी","खजुरा","कोहलपुर","नरैनापुर","नेपालगन्ज","राप्ती सोनारी"],
+      "बर्दिया": ["बढैयाताल","बाँसगढी","बारबर्दिया","गेरुवा","गुलरिया","मधुवन","राजापुर","ठाकुरबाबा"],
+      "दाङ": ["बबई","बंगलाचुली","दंगिशरण","गढवा","घोराही","लमही","राजपुर","राप्ती","शान्तिनगर","तुलसीपुर"],
+      "गुल्मी": ["चन्द्रकोट","चत्रकोट","गुल्मीदरबार","इस्मा","कालीगण्डकी","मदने","मलिका","मुसिकोट","रेसुंगा","रुरु","सत्यवती"],
+      "कपिलवस्तु": ["बाणगंगा","विजयनगर","बुद्धभूमि","कपिलवस्तु","कृष्णनगर","महाराजगन्ज","मायादेवी","शिवराज","शुद्धोधन","यशोधरा"],
+      "नवलपरासी पश्चिम": ["बर्दघाट","पाल्ही नन्दन","प्रतापपुर","रामग्राम","सरवल","सुनवल","सुस्ता"],
+      "पाल्पा": ["बागनास्कली","मठगढी","निस्दी","पूर्वखोला","रैनादेवी","रम्भा","रामपुर","रिब्दीकोट","तानसेन","तिनाउ"],
+      "प्युठान": ["आइराबत","गौमुखी","झिमरुक","मल्लरानी","मांडवी","नौबहिनी","प्युठान","सरूमरानी","स्वर्गद्वारी"],
+      "रोल्पा": ["गंगादेव","लुङ्गरी","माडी","परिवर्तन","रोल्पा","रुन्टीगढी","सुनछहरी","सुनिल स्मृति","थवाङ","त्रिवेणी"],
+      "रुकुम पूर्व": ["भुमे","पुथा उत्तरगंगा","सिस्ने"],
+      "रुपन्देही": ["बुटवल","देवदह","गैडहवा","कञ्चन","कोटाहिमाई","लुम्बिनी संस्कृत","मार्चवारी","मायादेवी","ओमसतिया","रोहिणी","सैनामैना","समरीमाइ","सिद्धार्थनगर","सियारी","शुद्धोधन","तिलोतमा"]
+    },
+    6: {
+      "दैलेख": ["आठबिस","भगवतीमाई","भैरवी","चामुण्डा बिन्द्रसैनी","दुल्लु","डुङ्गेश्वर","गुराँस","महाबु","नारायण","नौमुले","ठान्टिकाण्ड"],
+      "डोल्पा": ["छर्का ताङसोङ","डोल्पो बुद्ध","जगदुल्ला","काइके","मुड्केचुला","शे फोक्सुण्डो","ठुली भेरी","त्रिपुरासुन्दरी"],
+      "हুম्ला": ["अडांचुली","चनखेली","खार्पुनाथ","नम्खा","सार्केगड","सिमकोट","तान्जाकोट"],
+      "जाजरकोट": ["बारेकोट","भेरी","छेडागढ","जुनिचन्दे","कुसे","नालागड","शिवालय"],
+      "जुम्ला": ["चन्दननाथ","गुठीचौर","हिमा","कनकसुन्दरी","पत्रासी","सिन्जा","तातोपानी","तिला"],
+      "कालिकोट": ["खंडचक्र","महावाई","नरहरिनाथ","पाँचलझरना","पलाटा","रास्कोट","सन्नी त्रिवेणी","शुभ कालिका","तिलागुफा"],
+      "मुगु": ["छायानाथ रारा","खत्याड","मुगुम कर्मारोङ","सोरु"],
+      "रुकुम पश्चिम": ["आठबिस्कोट","बनफिकोट","चौरजहारी","मुसिकोट","सानी भेरी","त्रिवेणी"],
+      "सल्यान": ["बागचौर","बांगड","छत्रेश्वरी","डार्मा","कालीमाटी","कपुरकोट","कुमाख","शारदा","सिद्ध कुमाख","त्रिवेणी"],
+      "सुर्खेत": ["बराहताल","भेरीगंगा","वीरेन्द्रनगर","चौकुने","चिंगाड","गुर्भाकोट","लेकबेशी","पञ्चपुरी","सिम्ता"]
+    },
+    7: {
+      "अछाम": ["बान्नीगढी","चौरपाटी","ढकारी","कमलबजार","मंगलसेन","मेल्लेख","पञ्चदेवल विनायक","रामरोशन","साँफेबगर","तुर्मखाड"],
+      "बैतडी": ["दशरथचन्द","डिलासैनी","दोगडाकेदार","मेलौली","पञ्चेश्वर","पाटन","पुर्चौडी","शिवनाथ","सिगास","सुर्नाया"],
+      "बझाङ": ["बिठाडचिर","बुंगल","चाबिस्पाथीवेरा","दुर्गाथली","जय पृथ्वी","केदारसेउ","खप्तडछन्ना","मस्त","साइपाल","सुर्मा","तालकोट","थालारा"],
+      "बाजुरा": ["बडिमालिका","बुढीगंगा","बुढीनन्द","गौमुल","हिमाली","जगन्नाथ","खप्तड छेडेदह","स्वामी कार्तिक खापर","त्रिवेणी"],
+      "डडेल्धुरा": ["अजयमेरु","अलिताल","अमरगढी","भागेश्वर","गणयपधुरा","नवदुर्गा","परशुराम"],
+      "दार्चुला": ["एपिहिमल","ब्यास","दुन्हु","लेकम","महाकाली","मालिकार्जुन","मर्मा","नौगाड","शैल्यशिखर"],
+      "डोटी": ["आदर्श","बडीकेदार","दिपायल सिलगढी","जोरयाल","के आई सिंह","पूर्वचौकी","सायल","शिखर"],
+      "कैलाली": ["बर्दगोरिया","भजनी","चुरे","धनगढी","गौरीगंगा","घोडाघोडी","गोदावरी","जानकी","जोशीपुर","कैलारी","लम्कीचुहा","मोहन्याल","टीकापुर"],
+      "कञ्चनपुर": ["बेदकोट","बेलौरी","बेलडाँडी","भीमदत्त","कृष्णपुर","लालझण्डी","महाकाली","पुनर्वास","शुक्लाफाँटा"]
+    }
   }
 };
 
 // ==================== GLOBAL STATE ====================
-const state = {
+const state = (NVC.State.state = {
   currentUser: null,
   currentPage: CONFIG.DEFAULT_PAGE,
   currentShakha: null,
   notifications: [],
   complaints: [],
+  // Track new forwarded complaints per shakha (badge counts)
+  shakhaNewCounts: {},
+  // Track when a shakha last viewed online complaints (to reset badge counts)
+  shakhaSeen: {},
   projects: [],
   employeeMonitoring: [],
   citizenCharters: [],
+  investigations: [],
   users: [],
   filters: {},
   currentView: 'dashboard',
@@ -669,7 +831,7 @@ const state = {
   previousNotificationIds: null,
   notificationFilter: 'all',
   chatContext: null // च्याटको सन्दर्भ (context) राख्न
-};
+});
 
 // ==================== GLOBAL CHART STORAGE ====================
 window.nvcCharts = {};
@@ -678,7 +840,7 @@ window.nvcCharts = {};
 // ==================== NEPALI DATE FUNCTIONS (सही गरिएको) ====================
 
 // नेपाली मिति API प्रयोग गरेर आजको मिति प्राप्त गर्ने
-function getCurrentNepaliDate() {
+function _getCurrentNepaliDateLegacy() {
     // फारमको लागि नेपाली मिति YYYY-MM-DD format मा
     if (typeof NepaliDatePicker !== 'undefined' && NepaliDatePicker.ad2bs) {
         try {
@@ -712,8 +874,10 @@ function getCurrentNepaliDate() {
     return new Date().toISOString().slice(0, 10);
 }
 
+try { NVC.Utils.getCurrentNepaliDateLegacy = _getCurrentNepaliDateLegacy; } catch (e) {}
+
 // Initialize inline Nepali dropdown selectors (year / month / day)
-function initializeNepaliDropdowns() {
+function _initializeNepaliDropdowns() {
   const nepaliMonths = ["बैशाख","जेठ","असार","साउन","भदौ","असोज","कार्तिक","मंसिर","पुष","माघ","फागुन","चैत"];
   const monthDays = [30,31,32,31,32,30,30,29,30,29,30,30];
 
@@ -823,6 +987,12 @@ function initializeNepaliDropdowns() {
   });
 }
 
+NVC.Utils.initializeNepaliDropdowns = _initializeNepaliDropdowns;
+
+function initializeNepaliDropdowns() {
+  return NVC.Utils.initializeNepaliDropdowns.apply(this, arguments);
+}
+
 // ensure dropdowns are initialized after datepicker init
 setTimeout(() => { try { initializeNepaliDropdowns(); } catch(e) { console.warn('init nepali dropdowns failed', e); } }, 40);
 
@@ -849,7 +1019,7 @@ if (typeof MutationObserver !== 'undefined') {
 // ==================== NEPALI DATE FUNCTIONS (सुधारिएको) ====================
 
 // नेपाली मिति API प्रयोग गरेर आजको मिति प्राप्त गर्ने
-function getCurrentNepaliDate() {
+function _getCurrentNepaliDate() {
     const today = new Date();
     const adDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     // पहिलो प्राथमिकता: NepaliDatePicker (v5.x)
@@ -909,6 +1079,12 @@ function getCurrentNepaliDate() {
         console.warn('⚠️ Using fallback Nepali date calculation');
     }
     return getFallbackNepaliDate();
+}
+
+NVC.Utils.getCurrentNepaliDate = _getCurrentNepaliDate;
+
+function getCurrentNepaliDate() {
+  return NVC.Utils.getCurrentNepaliDate.apply(this, arguments);
 }
 
 // Helper: Convert Devanagari digits to Latin digits
@@ -1187,7 +1363,7 @@ function getFallbackNepaliDate() {
     return `${bsYear} ${monthName} ${bsDay}, ${dayName}`;
 }
 
-// Convert AD YYYY-MM-DD to BS YYYY-MM-DD using available libraries or fallback
+// Convert AD YYYY-MM-DD to BS YYYY-MM-DD using available libraries or accurate fallback
 function convertADtoBS(adDateStr) {
   if (!adDateStr) return '';
   try {
@@ -1196,41 +1372,81 @@ function convertADtoBS(adDateStr) {
     if (m) {
       const y = Number(m[1]);
       if (y >= 2050) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      
       // AD -> try available converters
       if (typeof NepaliDatePicker !== 'undefined' && typeof NepaliDatePicker.ad2bs === 'function') {
         const res = NepaliDatePicker.ad2bs(`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`);
-        if (res) return res;
+        if (res && res !== adDateStr) return res;
       }
       if (typeof $ !== 'undefined' && $.fn && $.fn.nepaliDatePicker && typeof $.fn.nepaliDatePicker.ad2bs === 'function') {
         const res = $.fn.nepaliDatePicker.ad2bs(`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`);
-        if (res) return res;
+        if (res && res !== adDateStr) return res;
       }
       if (typeof NepaliFunctions !== 'undefined' && typeof NepaliFunctions.AD2BS === 'function') {
         try {
           const res = NepaliFunctions.AD2BS(m[1], m[2], m[3]);
-          if (typeof res === 'string' && res.indexOf('-') !== -1) return res;
+          if (typeof res === 'string' && res.indexOf('-') !== -1 && res !== adDateStr) return res;
           if (res && res.year) return `${res.year}-${String(res.month).padStart(2,'0')}-${String(res.day).padStart(2,'0')}`;
         } catch (e) { /* ignore */ }
       }
-      // Last resort: try local heuristic similar to fallback mapping
-      // Parse AD date and shift by reference
+      
+      // Accurate fallback algorithm (same as backend)
       const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
       if (parts.every(n => !isNaN(n))) {
-        // Use the same algorithm as vendor shim
-        const refAD = new Date(2025, 1, 16);
-        const target = new Date(parts[0], parts[1]-1, parts[2]);
-        const diffDays = Math.round((target - refAD) / (1000*60*60*24));
-        const monthDays = [30,31,32,31,32,30,30,29,30,29,30,30];
-        let bsYear = 2081, bsMonth = 11, bsDay = 3 + diffDays;
-        while (bsDay > monthDays[bsMonth - 1]) { bsDay -= monthDays[bsMonth - 1]; bsMonth++; if (bsMonth>12){bsMonth=1;bsYear++;} }
-        while (bsDay < 1) { bsMonth--; if (bsMonth<1){bsMonth=12;bsYear--;} bsDay += monthDays[bsMonth-1]; }
-        return `${bsYear}-${String(bsMonth).padStart(2,'0')}-${String(bsDay).padStart(2,'0')}`;
+        return convertADtoBSAccurate(`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`);
       }
     }
   } catch (e) {
     console.warn('convertADtoBS failed:', e);
   }
   return '';
+}
+
+// Accurate AD to BS conversion - Final corrected version (matches backend)
+function convertADtoBSAccurate(adDateStr) {
+  try {
+    // Skip conversion if input is invalid
+    if (!adDateStr || adDateStr === 'undefined' || adDateStr === '') {
+      return getCurrentNepaliDate();
+    }
+    
+    // Try existing libraries first (synchronous)
+    if (typeof NepaliFunctions !== 'undefined' && typeof NepaliFunctions.AD2BS === 'function') {
+      try {
+        const m = String(adDateStr).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m) {
+          const res = NepaliFunctions.AD2BS(m[1], m[2], m[3]);
+          if (res && res.year) return `${res.year}-${String(res.month).padStart(2,'0')}-${String(res.day).padStart(2,'0')}`;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    
+    // Final corrected algorithm (matches backend exactly)
+    const m = String(adDateStr).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) {
+      const parts = [Number(m[1]), Number(m[2]), Number(m[3])];
+      if (parts.every(n => !isNaN(n))) {
+        // Match backend formula exactly
+        const adYear = parts[0];
+        const adMonth = parts[1];
+        const adDay = parts[2];
+        
+        // Backend formula: bsYear = adYear + 56, bsMonth = adMonth + 8, bsDay = adDay + 16
+        let bsYear = adYear + 56;
+        let bsMonth = adMonth + 8;
+        let bsDay = adDay + 16;
+        
+        if (bsDay > 30) { bsDay -= 30; bsMonth++; }
+        if (bsMonth > 12) { bsMonth -= 12; bsYear++; }
+        
+        return `${bsYear}-${String(bsMonth).padStart(2,'0')}-${String(bsDay).padStart(2,'0')}`;
+      }
+    }
+    
+    return getCurrentNepaliDate();
+  } catch (e) {
+    return getCurrentNepaliDate();
+  }
 }
 
 function ensureBSDate(raw) {
@@ -1952,6 +2168,115 @@ function showLoadingIndicator(show) {
   }
 }
 
+function setContentAreaHTML(html) {
+  const contentArea = document.getElementById('contentArea');
+  if (!contentArea) return;
+
+  try {
+    // If a caller has requested to suppress the content transition (e.g. frequent filter updates),
+    // render immediately without adding the transitioning class which can cause layout shifts.
+    if (state && state._suppressContentTransition) {
+      contentArea.innerHTML = html;
+      return;
+    }
+
+    contentArea.classList.add('is-transitioning');
+    setTimeout(() => {
+      contentArea.innerHTML = html;
+      requestAnimationFrame(() => {
+        contentArea.classList.remove('is-transitioning');
+      });
+    }, 120);
+  } catch (e) {
+    // Fallback to immediate render
+    contentArea.innerHTML = html;
+    contentArea.classList.remove('is-transitioning');
+  }
+}
+
+function buildComplaintsFilterChipsHTML(filters = {}) {
+  const chips = [];
+
+  const statusLabelMap = { pending: 'काम बाँकी', progress: 'चालु', resolved: 'फछ्रयौट' };
+  if (filters.status) {
+    chips.push({ key: 'status', label: `स्थिति: ${statusLabelMap[filters.status] || filters.status}` });
+  }
+  if (filters.finalDecisionType) {
+    chips.push({ key: 'finalDecisionType', label: `केन्द्रको निर्णय: ${filters.finalDecisionType}` });
+  }
+  if (filters.shakha) {
+    chips.push({ key: 'shakha', label: `शाखा: ${filters.shakha}` });
+  }
+  if (filters.ministry) {
+    chips.push({ key: 'ministry', label: `मन्त्रालय/निकाय: ${filters.ministry}` });
+  }
+  if (filters.startDate) {
+    chips.push({ key: 'startDate', label: `देखि: ${filters.startDate}` });
+  }
+  if (filters.endDate) {
+    chips.push({ key: 'endDate', label: `सम्म: ${filters.endDate}` });
+  }
+  if (filters.search) {
+    const field = filters.searchField && filters.searchField !== 'all' ? ` (${filters.searchField})` : '';
+    chips.push({ key: 'search', label: `खोजी${field}: ${filters.search}` });
+  }
+
+  if (chips.length === 0) return '';
+
+  const chipsHTML = chips.map(c => {
+    const safeLabel = String(c.label || '').replace(/"/g, '&quot;');
+    return `<span class="filter-chip" title="${safeLabel}">${c.label}<button class="chip-remove" type="button" onclick="removeComplaintsFilterChip('${c.key}')" aria-label="हटाउनुहोस्">×</button></span>`;
+  }).join('');
+
+  return `<div class="filter-chips">${chipsHTML}</div>`;
+}
+
+function removeComplaintsFilterChip(key) {
+  const current = {};
+  try {
+    current.status = document.getElementById('filterStatus')?.value || '';
+    current.finalDecisionType = document.getElementById('filterFinalDecisionType')?.value || '';
+    current.shakha = document.getElementById('filterShakha')?.value || '';
+    current.ministry = document.getElementById('filterMinistry')?.value || '';
+    current.searchField = document.getElementById('searchField')?.value || 'all';
+    current.search = document.getElementById('searchText')?.value || '';
+    current.sortOrder = document.getElementById('sortOrder')?.value || 'newest';
+    current.startDate = document.getElementById('filterStartDate')?.value || '';
+    current.endDate = document.getElementById('filterEndDate')?.value || '';
+  } catch (e) {}
+
+  if (key === 'status') current.status = '';
+  if (key === 'finalDecisionType') current.finalDecisionType = '';
+  if (key === 'shakha') current.shakha = '';
+  if (key === 'ministry') current.ministry = '';
+  if (key === 'startDate') current.startDate = '';
+  if (key === 'endDate') current.endDate = '';
+  if (key === 'search') current.search = '';
+
+  if (!state.pagination) state.pagination = { itemsPerPage: 10, currentPage: 1, totalItems: 0 };
+  state.pagination.currentPage = 1;
+  showComplaintsView({ ...current, _fromFilter: true });
+}
+
+function debouncedFilterComplaintsTable() {
+  if (state.currentView !== 'complaints') return;
+  if (!state._debounceTimers) state._debounceTimers = {};
+  // Save current caret/selection so we can restore it after the view re-renders
+  try {
+    const _in = document.getElementById('searchText');
+    if (_in) state._searchSelection = { start: _in.selectionStart, end: _in.selectionEnd, value: _in.value };
+  } catch(e) { state._searchSelection = null; }
+
+  clearTimeout(state._debounceTimers.complaintsFilter);
+  state._debounceTimers.complaintsFilter = setTimeout(() => {
+    try {
+      filterComplaintsTable();
+    } catch (e) {
+      console.error('debouncedFilterComplaintsTable failed', e);
+    }
+  }, 300);
+}
+
 function generateComplaintId() {
   const now = new Date();
   const year = now.getFullYear();
@@ -1977,6 +2302,16 @@ function ensureStylesheetsLoaded() {
     document.head.appendChild(fontAwesome);
   }
 
+  // Add custom styles for old complaints
+  if (!document.getElementById('custom-complaint-styles')) {
+    const style = document.createElement('style');
+    style.id = 'custom-complaint-styles';
+    style.innerHTML = `
+      .complaint-old-6mo { background-color: #fff3e0 !important; }
+      .complaint-old-year { background-color: #ffebee !important; }
+    `;
+    document.head.appendChild(style);
+  }
 }
 
 function ensureChartJsLoaded() {
@@ -2013,7 +2348,7 @@ function destroyAllCharts() {
 const initializeNepaliDatePickers = initializeDatepickers;
 
 // ==================== GOOGLE SHEETS API FUNCTIONS ====================
-async function getFromGoogleSheets(action, params = {}) {
+async function _getFromGoogleSheets(action, params = {}) {
   // Sheets disabled छ भने
   if (!GOOGLE_SHEETS_CONFIG.ENABLED) {
     console.log('ℹ️ Google Sheets disabled');
@@ -2103,9 +2438,13 @@ async function getFromGoogleSheets(action, params = {}) {
           if (window[callbackName]) {
             delete window[callbackName];
           }
-          if (script && script.parentNode) {
-            script.parentNode.removeChild(script);
-          }
+          try {
+            if (script) {
+              // Avoid NotFoundError if the script was already removed
+              if (script.isConnected && typeof script.remove === 'function') script.remove();
+              else if (script.parentNode) script.parentNode.removeChild(script);
+            }
+          } catch (e) {}
         } catch (e) {}
       };
       
@@ -2196,7 +2535,28 @@ async function getFromGoogleSheets(action, params = {}) {
   });
 }
 
-async function postToGoogleSheets(action, data = {}) {
+NVC.Api.getFromGoogleSheets = _getFromGoogleSheets;
+
+async function getFromGoogleSheets(action, params = {}) {
+  return NVC.Api.getFromGoogleSheets(action, params);
+}
+
+// Convenience helper to call the Apps Script function that ensures the ministry header exists
+async function ensureComplaintsHeader() {
+  try {
+    const res = await getFromGoogleSheets('ensureMinistryHeader');
+    console.log('ensureMinistryHeader result:', res);
+    if (res && res.success) showToast(`✅ ${res.message || 'Header ensured'}`, 'success');
+    else showToast(`⚠️ ${res.message || 'Failed to ensure header'}`, 'warning');
+    return res;
+  } catch (e) {
+    console.error('Error calling ensureMinistryHeader:', e);
+    showToast('❌ Header ensure call failed', 'error');
+    return { success: false, message: e.toString() };
+  }
+}
+
+async function _postToGoogleSheets(action, data = {}) {
   // Sheets disabled छ भने local storage मा save गर्ने
   if (!GOOGLE_SHEETS_CONFIG.ENABLED) {
     console.log('ℹ️ Google Sheets disabled - saving locally');
@@ -2338,8 +2698,13 @@ async function postToGoogleSheets(action, data = {}) {
         isResolved = true;
         clearTimeout(timeout);
         
-        delete window[callbackName];
-        if (script.parentNode) script.parentNode.removeChild(script);
+        try { delete window[callbackName]; } catch (e) {}
+        try {
+          if (script) {
+            if (script.isConnected && typeof script.remove === 'function') script.remove();
+            else if (script.parentNode) script.parentNode.removeChild(script);
+          }
+        } catch (e) {}
         
         console.log(`📨 JSONP POST Response [${action}]`, response ? '✅' : '⚠️');
         
@@ -2459,6 +2824,12 @@ async function postToGoogleSheets(action, data = {}) {
   });
 }
 
+NVC.Api.postToGoogleSheets = _postToGoogleSheets;
+
+async function postToGoogleSheets(action, data = {}) {
+  return NVC.Api.postToGoogleSheets(action, data);
+}
+
 async function loadDataFromGoogleSheets(forceReload = false) {
   if (window._isLoadingData && !forceReload) {
     console.log('⚠️ Already loading data, skipping...');
@@ -2551,38 +2922,61 @@ async function loadDataFromGoogleSheets(forceReload = false) {
       }
       
       showToast(`✅ ${state.complaints.length} उजुरीहरू लोड भयो`, 'success');
-      
-      // ===== STEP 5: LOAD OTHER DATA TYPES (non-blocking but awaited for view consistency) =====
+
+    // ===== STEP 5: DEFER OTHER DATA TYPES (load after complaints) =====
     try {
-      const [empRes, ccRes, projectsRes] = await Promise.all([
-        getFromGoogleSheets('getEmployeeMonitoring'),
-        getFromGoogleSheets('getCitizenCharter'),
-        getFromGoogleSheets('getProjects')
-      ]);
+      if (!window._isLoadingExtras) {
+        window._isLoadingExtras = true;
+        setTimeout(async () => {
+          try {
+            const [empRes, ccRes, projectsRes, invRes] = await Promise.all([
+              getFromGoogleSheets('getEmployeeMonitoring'),
+              getFromGoogleSheets('getCitizenCharter'),
+              getFromGoogleSheets('getProjects'),
+              getFromGoogleSheets('getInvestigations')
+            ]);
 
-      if (empRes && empRes.success && Array.isArray(empRes.data)) {
-        const formattedEmp = empRes.data.map(formatEmployeeMonitoringFromSheet).filter(Boolean);
-        state.employeeMonitoring = formattedEmp;
-        localStorage.setItem('nvc_employee_monitoring_backup', JSON.stringify(state.employeeMonitoring));
-      }
+            if (empRes && empRes.success && Array.isArray(empRes.data)) {
+              const formattedEmp = empRes.data.map(formatEmployeeMonitoringFromSheet).filter(Boolean);
+              state.employeeMonitoring = formattedEmp;
+              try { localStorage.setItem('nvc_employee_monitoring_backup', JSON.stringify(state.employeeMonitoring)); } catch (e) { /* ignore */ }
+            }
 
-      if (ccRes && ccRes.success && Array.isArray(ccRes.data)) {
-        const formattedCc = ccRes.data.map(formatCitizenCharterFromSheet).filter(Boolean);
-        state.citizenCharters = formattedCc;
-        localStorage.setItem('nvc_citizen_charters_backup', JSON.stringify(state.citizenCharters));
-      }
+            if (ccRes && ccRes.success && Array.isArray(ccRes.data)) {
+              const formattedCc = ccRes.data.map(formatCitizenCharterFromSheet).filter(Boolean);
+              state.citizenCharters = formattedCc;
+              try { localStorage.setItem('nvc_citizen_charters_backup', JSON.stringify(state.citizenCharters)); } catch (e) { /* ignore */ }
+            }
 
-      // ===== Projects =====
-      if (projectsRes && projectsRes.success && Array.isArray(projectsRes.data)) {
-        const formattedProjects = projectsRes.data.map(formatProjectFromSheet).filter(Boolean);
-        state.projects = formattedProjects;
-        try { localStorage.setItem('nvc_projects_backup', JSON.stringify(state.projects)); } catch (e) { /* ignore */ }
+            if (invRes && invRes.success && Array.isArray(invRes.data)) {
+              const formattedInv = invRes.data.map(formatInvestigationFromSheet).filter(Boolean);
+              state.investigations = formattedInv;
+              try { localStorage.setItem('nvc_investigations_backup', JSON.stringify(state.investigations)); } catch (e) { /* ignore */ }
+            }
+
+            if (projectsRes && projectsRes.success && Array.isArray(projectsRes.data)) {
+              const formattedProjects = projectsRes.data.map(formatProjectFromSheet).filter(Boolean);
+              state.projects = formattedProjects;
+              try { localStorage.setItem('nvc_projects_backup', JSON.stringify(state.projects)); } catch (e) { /* ignore */ }
+            }
+
+            // Refresh UI if needed after extras arrive
+            try {
+              if (typeof loadSidebarNavigation === 'function') loadSidebarNavigation();
+              if (typeof updateStats === 'function' && (state.currentPage === 'dashboardPage' || state.currentPage === 'dashboard')) updateStats();
+            } catch (e) { /* ignore */ }
+          } catch (e) {
+            console.warn('⚠️ Deferred load of extra datasets failed:', e);
+          } finally {
+            window._isLoadingExtras = false;
+          }
+        }, 0);
       }
     } catch (e) {
-      console.warn('⚠️ Could not load Employee Monitoring / Citizen Charter from Sheets:', e);
+      window._isLoadingExtras = false;
     }
 
-    // ===== STEP 6: UPDATE UI =====
+    // ===== STEP 6: UPDATE UI (complaints-first) =====
     if (state.currentPage === 'dashboardPage' || state.currentPage === 'dashboard') {
         // ===== STEP 5: UPDATE UI & RUN POST-LOAD TASKS =====
         if (typeof monitorHotspotAlerts === 'function') {
@@ -2647,6 +3041,8 @@ async function getData(dataType = 'complaints', params = {}) {
       return await getFromGoogleSheets('getEmployeeMonitoring', params);
     case 'citizen_charter':
       return await getFromGoogleSheets('getCitizenCharter', params);
+    case 'investigations':
+      return await getFromGoogleSheets('getInvestigations', params);
     default:
       return { success: false, data: [], message: 'Invalid data type' };
   }
@@ -2669,6 +3065,9 @@ async function saveData(dataType, data) {
       break;
     case 'citizen_charter':
       action = 'saveCitizenCharter';
+      break;
+    case 'investigation':
+      action = 'createInvestigation';
       break;
     default:
       return { success: false, message: 'Invalid data type' };
@@ -2745,6 +3144,8 @@ async function refreshData() {
         showEmployeeMonitoringView();
       } else if (state.currentView === 'citizen_charter') {
         showCitizenCharterView();
+      } else if (state.currentView === 'investigation') {
+        showInvestigationView();
       }
       
       return true;
@@ -2877,6 +3278,7 @@ function formatComplaintFromSheet(sheetData) {
       district: String(getValue('district', 'जिल्ला')),
       location: String(getValue('location', 'स्थानीय तह')),
       ward: String(getValue('ward', 'वडा')),
+      ministry: String(getValue('ministry', 'मन्त्रालय/निकाय', 'organization', 'निकाय') || ''),
     };
     
     // यदि ID छैन भने डाटा नलिने (खाली रो हुन सक्छ)
@@ -3056,6 +3458,49 @@ function formatCitizenCharterFromSheet(sheetData) {
     findings: String(getValue('findings', 'अनुगमनबाट देखिएको अवस्था', 'नागरिक बडापत्र अनुगमनबाट देखिएको अवस्था') || ''),
     instructions: String(getValue('instructions', 'निर्देशन', 'केन्द्रबाट दिइएको निर्देशन') || ''),
     instructionDate: String(getValue('instructionDate', 'निर्देशन मिति') || ''),
+    remarks: String(getValue('remarks', 'कैफियत') || ''),
+    createdBy: String(getValue('createdBy', 'सिर्जना गर्ने') || ''),
+    createdAt: String(getValue('createdAt', 'सिर्जना मिति') || ''),
+    updatedBy: String(getValue('updatedBy', 'अपडेट गर्ने') || ''),
+    updatedAt: String(getValue('updatedAt', 'अपडेट मिति') || '')
+  };
+}
+
+function formatInvestigationFromSheet(sheetData) {
+  if (!sheetData) return null;
+
+  const getValue = (...keys) => {
+    for (const key of keys) {
+      if (sheetData[key] !== undefined && sheetData[key] !== null && String(sheetData[key]).trim() !== '') {
+        return sheetData[key];
+      }
+      const foundKey = Object.keys(sheetData).find(k => String(k).trim().toLowerCase() === String(key).trim().toLowerCase());
+      if (foundKey && sheetData[foundKey] !== undefined && sheetData[foundKey] !== null && String(sheetData[foundKey]).trim() !== '') {
+        return sheetData[foundKey];
+      }
+    }
+    return '';
+  };
+
+  const id = String(getValue('id', 'आईडी', 'छानविन आईडी') || '').trim();
+  if (!id) return null;
+
+  return {
+    id,
+    complaintRegNo: String(getValue('complaintRegNo', 'उजुरी दर्ता नं') || ''),
+    registrationDate: String(getValue('registrationDate', 'दर्ता मिति') || ''),
+    complainant: String(getValue('complainant', 'उजुरकर्ता') || ''),
+    accused: String(getValue('accused', 'विपक्षी') || ''),
+    office: String(getValue('office', 'कार्यालय/निकाय') || ''),
+    ministry: String(getValue('ministry', 'सम्बन्धित मन्त्रालय/निकाय') || ''),
+    province: String(getValue('province', 'प्रदेश') || ''),
+    district: String(getValue('district', 'जिल्ला') || ''),
+    localLevel: String(getValue('localLevel', 'स्थानीय तह/नगर') || ''),
+    complaintDescription: String(getValue('complaintDescription', 'उजुरीको विवरण') || ''),
+    reportSubmissionDate: String(getValue('reportSubmissionDate', 'छानविन/अन्वेषण प्रतिवेदन पेश भएको मिति') || ''),
+    investigationOpinion: String(getValue('investigationOpinion', 'छानविन/अन्वेषणको राय') || ''),
+    implementationDetails: String(getValue('implementationDetails', 'कार्यान्वयनका लागि लेखि पठाएको व्यहोरा') || ''),
+    implementationDate: String(getValue('implementationDate', 'कार्यान्वयनका लागि लेखि पठाएको मिति') || ''),
     remarks: String(getValue('remarks', 'कैफियत') || ''),
     createdBy: String(getValue('createdBy', 'सिर्जना गर्ने') || ''),
     createdAt: String(getValue('createdAt', 'सिर्जना मिति') || ''),
@@ -3274,9 +3719,10 @@ async function saveNewComplaint() {
     'Branch': shakhaName || shakhaToSave, // Main key for sheet
     
     'Entry Branch': shakhaName || shakhaToSave,
+    ministry: document.getElementById('complaintMinistry')?.value || '',
     province: normalizeProvinceName(document.getElementById('complaintProvince')?.value || ''),
     district: document.getElementById('complaintDistrict')?.value || '',
-    location: document.getElementById('complaintLocation')?.value || ''
+    location: document.getElementById('complaintLocal')?.value || ''
   };
   
   console.log('📦 Complaint data prepared:', Object.keys(complaintData).join(', '));
@@ -3297,13 +3743,14 @@ async function saveNewComplaint() {
     remarks: complaintRemarks || '',
     status: complaintStatus,
     shakha: shakhaToSave,
+    ministry: document.getElementById('complaintMinistry')?.value || '',
     mahashakha: mahashakhaName,
     createdBy: state.currentUser?.name || '',
     createdAt: new Date().toISOString(),
     entryDate: new Date().toISOString().slice(0, 10),
     province: normalizeProvinceName(document.getElementById('complaintProvince')?.value || ''),
     district: document.getElementById('complaintDistrict')?.value || '',
-    location: document.getElementById('complaintLocation')?.value || '',
+    location: document.getElementById('complaintLocal')?.value || '',
     syncedToSheets: result?.success === true,
     source: 'internal'
   };
@@ -3314,6 +3761,8 @@ async function saveNewComplaint() {
   // ========== 7. BACKUP TO LOCALSTORAGE ==========
   try {
     backupToLocalStorage();
+    // Clear the saved draft after successful submission
+    try { localStorage.removeItem('nvc_complaint_draft'); } catch (e) {}
   } catch (e) {}
   
   showLoadingIndicator(false);
@@ -3369,6 +3818,18 @@ async function saveEditedComplaint(complaintId) {
       remarks: document.getElementById('editRemarks').value,
       decision: document.getElementById('editDecision').value,
       status: document.getElementById('editStatus').value
+      ,
+      // Location & Ministry
+      'मन्त्रालय/निकाय': document.getElementById('editMinistry')?.value || '',
+      ministry: document.getElementById('editMinistry')?.value || '',
+      'प्रदेश': document.getElementById('editProvince')?.value || '',
+      province: (typeof normalizeProvinceName === 'function') ? normalizeProvinceName(document.getElementById('editProvince')?.value || '') : document.getElementById('editProvince')?.value || '',
+      'जिल्ला': document.getElementById('editDistrict')?.value || '',
+      district: document.getElementById('editDistrict')?.value || '',
+      'स्थानीय तह': document.getElementById('editLocalLevel')?.value || '',
+      localLevel: document.getElementById('editLocalLevel')?.value || '',
+      'वडा': document.getElementById('editWard')?.value || '',
+      ward: document.getElementById('editWard')?.value || ''
     };
 
     // Send to Google Sheets
@@ -3386,6 +3847,11 @@ async function saveEditedComplaint(complaintId) {
       finalDecision: updatePayload['अन्तिम निर्णयको प्रकार'],
       remarks: updatePayload['कैफियत'],
       status: updatePayload['स्थिति'],
+      ministry: updatePayload['मन्त्रालय/निकाय'] || updatePayload.ministry || state.complaints[index].ministry,
+      province: updatePayload['प्रदेश'] || updatePayload.province || state.complaints[index].province,
+      district: updatePayload['जिल्ला'] || updatePayload.district || state.complaints[index].district,
+      localLevel: updatePayload['स्थानीय तह'] || updatePayload.localLevel || state.complaints[index].localLevel,
+      ward: updatePayload['वडा'] || updatePayload.ward || state.complaints[index].ward,
       updatedAt: new Date().toISOString(),
       updatedBy: state.currentUser?.name,
       syncedToSheets: result?.success === true
@@ -3989,11 +4455,17 @@ function openModal(title, content) {
   applyDevanagariDigits(document.getElementById('complaintModal'));
 }
 
-function closeModal() {
+function _closeModal() {
   document.getElementById('complaintModal').classList.add('hidden');
 }
 
-function openShakhaSelection() {
+NVC.UI.closeModal = _closeModal;
+
+function closeModal() {
+  return NVC.UI.closeModal.apply(this, arguments);
+}
+
+function _openShakhaSelection() {
   document.getElementById('shakhaModal').classList.remove('hidden');
   
   const modalBody = document.querySelector('#shakhaModal .modal-body');
@@ -4003,6 +4475,12 @@ function openShakhaSelection() {
       <h4 class="module-title">${value}</h4>
     </div>
   `).join('');
+}
+
+NVC.UI.openShakhaSelection = _openShakhaSelection;
+
+function openShakhaSelection() {
+  return NVC.UI.openShakhaSelection.apply(this, arguments);
 }
 
 function closeShakhaModal() {
@@ -4225,7 +4703,54 @@ function deleteNotification(event, id) {
 function startNotificationPolling() {
   if (window.notificationInterval) clearInterval(window.notificationInterval);
   loadNotifications();
-  window.notificationInterval = setInterval(loadNotifications, 60000); // Poll every minute
+  loadNewEntriesBadge();
+  // Poll notifications and new entries every minute
+  window.notificationInterval = setInterval(() => { loadNotifications(); loadNewEntriesBadge(); }, 60000);
+}
+
+// Fetch new-entry counts from server and update the `pendingCount` badge for admin/mahashakha
+async function loadNewEntriesBadge() {
+  try {
+    if (!GOOGLE_SHEETS_CONFIG.ENABLED) return;
+    if (!state.currentUser) return;
+    const el = document.getElementById('pendingCount');
+    if (!el) return;
+
+    if (state.currentUser.role === 'admin') {
+      const res = await getFromGoogleSheets('getNewEntries', { role: 'admin' });
+      const n = (res && res.success) ? Number(res.newCount || 0) : 0;
+      el.textContent = n > 0 ? _latinToDevnagari(n) : '';
+      el.style.display = n > 0 ? 'inline-flex' : 'none';
+    } else if (state.currentUser.role === 'mahashakha') {
+      const mah = state.currentUser.mahashakha || state.currentUser.name || '';
+      const res = await getFromGoogleSheets('getNewEntries', { role: 'mahashakha', mahashakha: mah });
+      const n = (res && res.success) ? Number(res.newCount || 0) : 0;
+      el.textContent = n > 0 ? _latinToDevnagari(n) : '';
+      el.style.display = n > 0 ? 'inline-flex' : 'none';
+    } else {
+      // Non-admin/mahashakha show regular pending count
+      updatePendingCountBadge();
+    }
+  } catch (e) {
+    console.error('Error loading new entries badge', e);
+  }
+}
+
+async function markSeenNewEntries() {
+  try {
+    if (!GOOGLE_SHEETS_CONFIG.ENABLED) return;
+    if (!state.currentUser) return;
+    if (state.currentUser.role === 'admin') {
+      await getFromGoogleSheets('markSeenNewEntries', { role: 'admin' });
+      // immediately clear badge
+      const el = document.getElementById('pendingCount'); if (el) { el.textContent = ''; el.style.display = 'none'; }
+    } else if (state.currentUser.role === 'mahashakha') {
+      const mah = state.currentUser.mahashakha || state.currentUser.name || '';
+      if (!mah) return;
+      await getFromGoogleSheets('markSeenNewEntries', { role: 'mahashakha', mahashakha: mah });
+      const el = document.getElementById('pendingCount'); if (el) { el.textContent = ''; el.style.display = 'none'; }
+    }
+  } catch (e) { console.error('markSeenNewEntries error', e); }
 }
 
 function toggleNotifications() {
@@ -4297,47 +4822,118 @@ function handleLogin() {
   loginBtn.innerHTML = '<div class="spinner"></div>';
   loginBtn.disabled = true;
   
-  setTimeout(() => {
-    if (username === 'admin' && password === 'nvc123') {
-      state.currentUser = {
-        id: 'admin', name: 'एडमिन', role: 'admin',
-        avatar: 'A', shakha: null,
-        mahashakha: null, permissions: ['all']
-      };
-      
-      const session = { user: state.currentUser, expires: Date.now() + (24 * 60 * 60 * 1000) };
-      localStorage.setItem('nvc_session', JSON.stringify(session));
-      
-      showDashboardPage();
-    } else {
-      const user = findUserByCredentials(username, password);
-      if (user) {
-        const finalRole = user.role || 'shakha';
-        
-        // Determine Shakha Name (Use Nepali Name if available)
-        let userShakha = null;
-        if (finalRole === 'shakha' || finalRole === 'admin_planning') {
-            userShakha = SHAKHA[user.code.toUpperCase()] || user.code;
-        }
+  setTimeout(async () => {
+    try {
+      // Prefer Google Sheets authentication when enabled so admin-managed users can login.
+      if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+        const authRes = await getFromGoogleSheets('authenticateUser', { username, password });
+        if (authRes && authRes.success && authRes.user) {
+          const user = authRes.user;
+          const finalRole = (user.role || 'shakha').toString();
 
-        state.currentUser = {
-          id: user.code, name: user.name, role: finalRole,
-          avatar: user.name.charAt(0), shakha: userShakha,
-          mahashakha: user.mahashakha, permissions: user.permissions || []
-        };
-        
-        const session = { user: state.currentUser, expires: Date.now() + (24 * 60 * 60 * 1000) };
-        localStorage.setItem('nvc_session', JSON.stringify(session));
-        
-        showDashboardPage();
+          const rawPermissions = user.permissions || user.Permissions || '';
+          const permissions = Array.isArray(rawPermissions)
+            ? rawPermissions
+            : String(rawPermissions).split(',').map(s => s.trim()).filter(Boolean);
+
+          let userShakha = null;
+          if (finalRole === 'shakha' || finalRole === 'admin_planning') {
+            const code = (user.shakha || user.code || '').toString();
+            userShakha = SHAKHA[code.toUpperCase()] || code;
+          }
+
+          state.currentUser = {
+            id: user.username || user.code || username,
+            name: user.name || username,
+            role: finalRole,
+            avatar: (user.name || username).toString().charAt(0) || 'U',
+            shakha: userShakha,
+            mahashakha: user.mahashakha || null,
+            permissions
+          };
+
+          const session = { user: state.currentUser, expires: Date.now() + (24 * 60 * 60 * 1000) };
+          localStorage.setItem('nvc_session', JSON.stringify(session));
+          showDashboardPage();
+        } else {
+          showToast('युजरनेम वा पासवर्ड मिलेन', 'error');
+        }
       } else {
-        showToast('युजरनेम वा पासवर्ड मिलेन', 'error');
+        if (username === 'admin' && password === 'nvc123') {
+          state.currentUser = {
+            id: 'admin', name: 'एडमिन', role: 'admin',
+            avatar: 'A', shakha: null,
+            mahashakha: null, permissions: ['all']
+          };
+
+          const session = { user: state.currentUser, expires: Date.now() + (24 * 60 * 60 * 1000) };
+          localStorage.setItem('nvc_session', JSON.stringify(session));
+          showDashboardPage();
+        } else {
+          const user = findUserByCredentials(username, password);
+          if (user) {
+            const finalRole = user.role || 'shakha';
+
+            // Determine Shakha Name (Use Nepali Name if available)
+            let userShakha = null;
+            if (finalRole === 'shakha' || finalRole === 'admin_planning') {
+              userShakha = SHAKHA[user.code.toUpperCase()] || user.code;
+            }
+
+            state.currentUser = {
+              id: user.code, name: user.name, role: finalRole,
+              avatar: user.name.charAt(0), shakha: userShakha,
+              mahashakha: user.mahashakha, permissions: user.permissions || []
+            };
+
+            const session = { user: state.currentUser, expires: Date.now() + (24 * 60 * 60 * 1000) };
+            localStorage.setItem('nvc_session', JSON.stringify(session));
+            showDashboardPage();
+          } else {
+            showToast('युजरनेम वा पासवर्ड मिलेन', 'error');
+          }
+        }
       }
+    } catch (e) {
+      console.error('Login error', e);
+      showToast('लगइन गर्दा समस्या आयो', 'error');
+    } finally {
+      loginBtn.innerHTML = originalText;
+      loginBtn.disabled = false;
     }
-    
-    loginBtn.innerHTML = originalText;
-    loginBtn.disabled = false;
   }, 1000);
+}
+
+async function loadUsersFromSheetsForAdmin() {
+  if (!state.currentUser || state.currentUser.role !== 'admin') return { success: false, data: [] };
+  if (!GOOGLE_SHEETS_CONFIG.ENABLED) return { success: true, data: state.users || [], local: true };
+
+  try {
+    const res = await getFromGoogleSheets('getUsers');
+    if (res && res.success && Array.isArray(res.data)) {
+      state.users = res.data.map(u => {
+        const role = (u.role || '').toString();
+        const rawPerm = u.permissions || u.Permissions || '';
+        const permissions = Array.isArray(rawPerm) ? rawPerm : String(rawPerm).split(',').map(s => s.trim()).filter(Boolean);
+        return {
+          username: u.username,
+          name: u.name || '',
+          role: role || 'shakha',
+          shakha: u.shakha || '',
+          mahashakha: u.mahashakha || '',
+          permissions,
+          status: u.status || 'active',
+          lastLogin: u.last_login || u.lastLogin || '-',
+          createdAt: u.created_at || u.createdAt || ''
+        };
+      });
+      return { success: true, data: state.users };
+    }
+    return { success: false, data: [], message: res && res.message ? res.message : 'Failed to load users' };
+  } catch (e) {
+    console.error('loadUsersFromSheetsForAdmin error', e);
+    return { success: false, data: [], message: e.toString() };
+  }
 }
 
 function handleForgotPassword(event) {
@@ -4430,12 +5026,18 @@ function findUserByCredentials(username, password) {
   return [...shakhas, ...mahashakhas].find(u => u.username === username && u.password === password);
 }
 
-function logout() {
+function _logout() {
   if (!confirm('के तपाईं लग-आउट गर्न चाहनुहुन्छ?')) return;
   state.currentUser = null;
   localStorage.removeItem('nvc_session');
   if (window.notificationInterval) clearInterval(window.notificationInterval);
   showPage('mainPage');
+}
+
+NVC.UI.logout = _logout;
+
+function logout() {
+  return NVC.UI.logout.apply(this, arguments);
 }
 
 function initializeDashboard() {
@@ -4448,6 +5050,85 @@ function initializeDashboard() {
   addGoogleSheetsButtons();
   addRefreshButton();
   updateSyncButton();
+  // Fetch lightweight counts for badges/widgets to speed up UI
+  try { fetchCountsAndUpdateUI(); } catch (e) {}
+}
+
+// Fetch cached counts from Apps Script and refresh UI elements
+async function fetchCountsAndUpdateUI() {
+  if (!GOOGLE_SHEETS_CONFIG.ENABLED) return;
+  try {
+    const res = await getFromGoogleSheets('getCounts');
+    if (!res || !res.success || !res.data) return;
+    state.counts = res.data;
+
+    // Refresh sidebar badges
+    try { loadSidebarNavigation(); } catch (e) {}
+
+    // If currently viewing admin planning dashboard, re-render it
+    if (state.currentUser && state.currentUser.role === 'admin_planning' && state.currentView === 'dashboard') {
+      try { showDashboardView(); } catch (e) {}
+    }
+  } catch (e) {
+    console.warn('fetchCountsAndUpdateUI failed', e);
+  }
+}
+
+// Test helper: inject mock counts locally (no server needed) and refresh UI
+function injectMockCounts(sample) {
+  const sampleCounts = sample || {
+    helloTotal: 12,
+    helloPending: 5,
+    onlineTotal: 9,
+    onlinePending: 3,
+    onlineResolved: 6,
+    perShakha: {
+      byName: { 'Complaint Management': 2, 'Finance': 1 },
+      byKey: { 'complaint_management': 2, 'finance': 1 },
+      unassigned: 1
+    }
+  };
+  state.counts = sampleCounts;
+  try { loadSidebarNavigation(); } catch (e) {}
+  try { showDashboardView(); } catch (e) {}
+  console.log('Mock counts injected', sampleCounts);
+}
+
+function clearMockCounts() {
+  delete state.counts;
+  try { loadSidebarNavigation(); } catch (e) {}
+  try { showDashboardView(); } catch (e) {}
+  console.log('Mock counts cleared');
+}
+
+// Monkeypatch helper: intercept getFromGoogleSheets for 'getCounts' calls
+let __originalGetFromGoogleSheets = null;
+function enableMockGetCounts(mockData) {
+  if (!__originalGetFromGoogleSheets) __originalGetFromGoogleSheets = getFromGoogleSheets;
+  window.__mockCountsData = mockData || window.__mockCountsData || {
+    helloTotal: 12,
+    helloPending: 5,
+    onlineTotal: 9,
+    onlinePending: 3,
+    onlineResolved: 6,
+    perShakha: { byName: { 'Complaint Management': 2 }, byKey: { 'complaint_management': 2 }, unassigned: 1 }
+  };
+  window.getFromGoogleSheets = async function(action, params) {
+    if (String(action) === 'getCounts') {
+      return { success: true, data: window.__mockCountsData };
+    }
+    return __originalGetFromGoogleSheets.apply(this, arguments);
+  };
+  console.log('Mock getCounts enabled');
+}
+
+function disableMockGetCounts() {
+  if (__originalGetFromGoogleSheets) {
+    window.getFromGoogleSheets = __originalGetFromGoogleSheets;
+    __originalGetFromGoogleSheets = null;
+  }
+  delete window.__mockCountsData;
+  console.log('Mock getCounts disabled');
 }
 
 function updateUserInfo() {
@@ -4466,6 +5147,27 @@ function updateUserInfo() {
   if (topbarUserName) topbarUserName.textContent = state.currentUser.name;
   if (topbarUserRole) topbarUserRole.textContent = state.currentUser.role === 'admin' ? 'एडमिन' : SHAKHA[state.currentUser.shakha] || state.currentUser.shakha;
   if (topbarAvatar) topbarAvatar.textContent = state.currentUser.avatar;
+}
+
+function animateCountUp(element, endValue) {
+  if (!element) return;
+  let startValue = 0;
+  const duration = 1500; // 1.5 सेकेन्ड
+  const stepTime = Math.abs(Math.floor(duration / (endValue || 1)));
+  
+  if (endValue === 0) {
+      element.textContent = _latinToDevnagari(0);
+      return;
+  }
+
+  const timer = setInterval(() => {
+    startValue += 1;
+    element.textContent = _latinToDevnagari(startValue);
+    if (startValue >= endValue) {
+      clearInterval(timer);
+      element.textContent = _latinToDevnagari(endValue);
+    }
+  }, Math.max(stepTime, 10));
 }
 
 function loadDashboardData() {
@@ -4488,9 +5190,9 @@ function updateStats() {
   const pendingEl = document.getElementById('pendingComplaintsMain');
   const resolvedEl = document.getElementById('resolvedComplaintsMain');
   
-  if (totalEl) totalEl.textContent = _latinToDevnagari(total);
-  if (pendingEl) pendingEl.textContent = _latinToDevnagari(pending);
-  if (resolvedEl) resolvedEl.textContent = _latinToDevnagari(resolved);
+  animateCountUp(totalEl, total);
+  animateCountUp(pendingEl, pending);
+  animateCountUp(resolvedEl, resolved);
 }
 
 function setupEventListeners() {
@@ -4599,13 +5301,48 @@ function loadSidebarNavigation() {
       <a href="#" class="nav-item" onclick="showSettingsView()"><i class="fas fa-cog"></i><span class="nav-text">सेटिङहरू</span></a>
     `;
   } else if (state.currentUser.role === 'admin_planning') {
-    const helloSarkarPending = state.complaints.filter(c => c.source === 'hello_sarkar' && c.status === 'pending').length;
+    // Prefer lightweight server counts when available to speed up UI
+    const counts = state.counts || null;
+    // Aggregate counts from both main complaints and onlineComplaints store (fallback)
+    const allComplaints = (state.complaints || []).concat(state.onlineComplaints || []);
+    const helloSarkarPending = (counts && typeof counts.helloPending === 'number') ? counts.helloPending : allComplaints.filter(c => String(c.source).toLowerCase() === 'hello_sarkar' && c.status === 'pending').length;
+    const onlinePending = (counts && typeof counts.onlinePending === 'number') ? counts.onlinePending : allComplaints.filter(c => ['online','online_complaint'].includes(String(c.source).toLowerCase()) && c.status === 'pending').length;
     navItems = `
       <a href="#" class="nav-item active" onclick="showDashboardView()"><i class="fas fa-tachometer-alt"></i><span class="nav-text">ड्यासबोर्ड</span></a>
       <a href="#" class="nav-item" onclick="showAdminComplaintsView()"><i class="fas fa-file-alt"></i><span class="nav-text">हेलो सरकार उजुरीहरू</span><span class="badge badge-danger ms-auto" id="pendingCount">${helloSarkarPending}</span></a>
+      <a href="#" class="nav-item" onclick="showOnlineComplaintsView()"><i class="fas fa-globe"></i><span class="nav-text">अनलाइन उजुरी</span><span class="badge badge-danger ms-auto">${onlinePending}</span></a>
       <a href="#" class="nav-item" onclick="showEmployeeMonitoringView()"><i class="fas fa-user-clock"></i><span class="nav-text">कार्यालय अनुगमन</span></a>
       <a href="#" class="nav-item" onclick="showCitizenCharterView()"><i class="fas fa-file-contract"></i><span class="nav-text">नागरिक बडापत्र अनुगमन</span></a>
+      <a href="#" class="nav-item" onclick="showInvestigationView()"><i class="fas fa-search"></i><span class="nav-text">छानविन/अन्वेषण</span></a>
       <a href="#" class="nav-item" onclick="showReportsView()"><i class="fas fa-chart-bar"></i><span class="nav-text">रिपोर्टहरू</span></a>
+    `;
+  } else if (state.currentUser.role === 'shakha') {
+    // For branch users show count of forwarded online complaints (use server counts if available)
+    const userShakhaCode = state.currentUser.shakha || '';
+    const userShakhaName = (SHAKHA && SHAKHA[userShakhaCode]) ? SHAKHA[userShakhaCode] : userShakhaCode;
+    let newCount = 0;
+    const counts2 = state.counts || null;
+    if (counts2 && counts2.perShakha) {
+      const normalizeKeyLocal = function(v) { try { return String(v || '').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\u0900-\u097F]/g,'').trim(); } catch(e) { return String(v || '').toLowerCase(); } };
+      const key = normalizeKeyLocal(userShakhaName || userShakhaCode);
+      newCount = (counts2.perShakha.byKey && counts2.perShakha.byKey[key]) ? counts2.perShakha.byKey[key] : ((counts2.perShakha.byName && counts2.perShakha.byName[userShakhaName]) ? counts2.perShakha.byName[userShakhaName] : 0);
+    } else {
+      // Fallback: count online complaints since last seen (pre-existing behavior)
+      const seenTs = (state.shakhaSeen && state.shakhaSeen[userShakhaName]) ? new Date(state.shakhaSeen[userShakhaName]).getTime() : 0;
+      const onlineList = state.onlineComplaints || [];
+      newCount = onlineList.filter(c => {
+        const assigned = (c.assignedShakha || c.assignedShakhaCode || '').toString();
+        const isForThis = !assigned || assigned === userShakhaName || assigned === userShakhaCode;
+        const created = c.created_at ? new Date(c.created_at).getTime() : (c.updated_at ? new Date(c.updated_at).getTime() : 0);
+        return isForThis && created > seenTs;
+      }).length;
+    }
+    navItems = `
+      <a href="#" class="nav-item active" onclick="showDashboardView()"><i class="fas fa-tachometer-alt"></i><span class="nav-text">ड्यासबोर्ड</span></a>
+      <a href="#" class="nav-item" onclick="clearShakhaNewCount(); showComplaintsView(); return false;"><i class="fas fa-file-alt"></i><span class="nav-text">उजुरीहरू</span><span class="badge badge-danger ms-auto" id="pendingCount">${newCount}</span></a>
+      <a href="#" class="nav-item" onclick="showNewComplaintView()"><i class="fas fa-plus-circle"></i><span class="nav-text">नयाँ उजुरी</span></a>
+      <a href="#" class="nav-item" onclick="showReportsView()"><i class="fas fa-chart-bar"></i><span class="nav-text">रिपोर्टहरू</span></a>
+      <a href="#" class="nav-item" onclick="showCalendarView()"><i class="fas fa-calendar-alt"></i><span class="nav-text">क्यालेन्डर</span></a>
     `;
   } else if (state.currentUser.permissions?.includes('technical_inspection')) {
     navItems = `
@@ -4628,6 +5365,21 @@ function loadSidebarNavigation() {
   
   nav.innerHTML = navItems;
   applyDevanagariDigits(nav);
+}
+
+// Clear new-forwarded badge count for current user's shakha
+function clearShakhaNewCount() {
+  try {
+    if (!state.currentUser) return;
+    const shakhaCode = state.currentUser.shakha || '';
+    const shakhaName = (SHAKHA && SHAKHA[shakhaCode]) ? SHAKHA[shakhaCode] : shakhaCode;
+    state.shakhaSeen = state.shakhaSeen || {};
+    state.shakhaSeen[shakhaName] = new Date().toISOString();
+    // Re-render sidebar to update badge
+    loadSidebarNavigation();
+    // Persist
+    try { backupToLocalStorage(); } catch(e) {}
+  } catch (e) { console.warn('clearShakhaNewCount failed', e); }
 }
 
 function initializeDashboardCharts() {
@@ -4893,25 +5645,140 @@ function initializeDashboardCharts() {
       } catch (e) { console.error('❌ Error creating trend chart:', e); }
     }
     
+    // ===== Ministry / Organization Charts (Admin / Mahashakha / Shakha) =====
+    // Helper to build ministry counts and chart
+    function buildMinistryChartInstance(canvasId, complaintsList, chartKey) {
+      try {
+        const el = document.getElementById(canvasId);
+        if (!el) return;
+        if (window.nvcCharts && window.nvcCharts[chartKey]) try { window.nvcCharts[chartKey].destroy(); } catch (e) {}
+
+        // Group by ministry field (try multiple keys)
+        const counts = {};
+        (complaintsList || []).forEach(c => {
+          const m = (c.ministry || c['मन्त्रालय/निकाय'] || c.organization || c['निकाय'] || '').toString().trim() || 'अन्य';
+          counts[m] = (counts[m] || 0) + 1;
+        });
+
+        const entries = Object.keys(counts).map(k => ({ k, v: counts[k] })).sort((a,b) => b.v - a.v);
+        const labels = entries.map(e => e.k);
+        const data = entries.map(e => e.v);
+
+        // Generate colors
+        const palette = ['#2E86AB','#F6C85F','#F26419','#66A182','#9B59B6','#E74C3C','#3498DB','#1ABC9C','#F39C12','#8E44AD'];
+        const background = labels.map((_,i) => palette[i % palette.length]);
+
+        window.nvcChartsData[chartKey] = { labels: labels, datasets: [{ data: data, backgroundColor: background, borderWidth: 0 }] };
+
+        window.nvcCharts[chartKey] = new Chart(el.getContext('2d'), {
+          type: 'doughnut',
+          data: window.nvcChartsData[chartKey],
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: { callbacks: { label: function(ctx) { const val = ctx.raw || 0; const total = ctx.dataset.data.reduce((a,b)=>a+b,0); const pct = total>0?Math.round((val/total)*100):0; return `${ctx.label}: ${val} (${pct}%)`; } } }
+            },
+            onClick: (evt, elems, chart) => {
+              if (elems.length > 0) {
+                const i = elems[0].index;
+                const label = chart.data.labels[i];
+                showChartDrillDown({ ministry: label }, `${label} अन्तर्गत उजुरीहरू`);
+              }
+            }
+          }
+        });
+      } catch (err) { console.error('Error building ministry chart', canvasId, err); }
+    }
+
+    // Admin-level ministry chart (all complaints)
+    try {
+      const adminComplCanvas = document.getElementById('adminMinistryChart');
+      if (adminComplCanvas) buildMinistryChartInstance('adminMinistryChart', state.complaints || [], 'adminMinistryChart');
+    } catch (e) {}
+
+    // Mahashakha-level ministry chart (complaints entered by users under this mahashakha OR where complaint.mahashakha matches)
+    try {
+      const mahCanvas = document.getElementById('mahashakhaMinistryChart');
+      if (mahCanvas) {
+        const mahashakha = state.currentUser?.mahashakha || state.currentUser?.name || '';
+        let mahComplaints = (state.complaints || []).filter(c => (c.mahashakha || '') === mahashakha || (function(){
+          // Try mapping createdBy to a user and match user's mahashakha
+          const creator = (c => {
+            try { const name = (c.createdBy || '').toString(); if (!name) return null; return (state.users||[]).find(u=>String(u.username)===String(name) || String(u.name)===String(name)); } catch(e){return null}
+          })(c);
+          return creator && (creator.mahashakha === mahashakha || creator.mahashakha === state.currentUser?.mahashakha);
+        })());
+        buildMinistryChartInstance('mahashakhaMinistryChart', mahComplaints, 'mahashakhaMinistryChart');
+      }
+    } catch (e) {}
+
+    // Shakha-level ministry chart (complaints entered by users of this shakha OR where complaint.shakha matches)
+    try {
+      const shakhaCanvas = document.getElementById('shakhaMinistryChart');
+      if (shakhaCanvas) {
+        const userShakha = state.currentUser?.shakha || '';
+        const shakhaComplaints = (state.complaints || []).filter(c => {
+          if ((c.shakha || '') === userShakha) return true;
+          const name = (c.createdBy || '').toString();
+          if (!name) return false;
+          const creator = (state.users || []).find(u => String(u.username) === String(name) || String(u.name) === String(name));
+          if (creator && (creator.shakha === userShakha || creator.shakha === (state.currentUser?.shakha))) return true;
+          return false;
+        });
+        buildMinistryChartInstance('shakhaMinistryChart', shakhaComplaints, 'shakhaMinistryChart');
+      }
+    } catch (e) {}
+    
     const projectCtx = document.getElementById('projectStatusChart');
     if (projectCtx) {
       if (window.nvcCharts.projectChart) window.nvcCharts.projectChart.destroy();
-      
-      let technicalProjects = state.projects || [];
-      if (state.currentUser && state.currentUser.role !== 'admin') {
-        const userShakhaName = (state.currentUser.shakha || '').trim();
-        const userCode = (state.currentUser.id || '').trim();
-        technicalProjects = technicalProjects.filter(p => {
-          const pShakha = (p.shakha || '').trim();
-          return pShakha === userShakhaName || 
-                 pShakha.toLowerCase() === userCode.toLowerCase() ||
-                 SHAKHA[pShakha] === userShakhaName ||
-                 SHAKHA[pShakha.toUpperCase()] === userShakhaName;
-        });
+
+      const isTechnicalMahashakhaUser = () => {
+        try {
+          const u = state.currentUser || {};
+          if (u.role !== 'mahashakha') return false;
+          const mah = (u.mahashakha || u.name || '').toString();
+          return mah === MAHASHAKHA.TECHNICAL;
+        } catch (e) {
+          return false;
+        }
+      };
+
+      // Prefer explicitly scoped data from overview (chart + data view) ONLY when in overview screen
+      const canUseOverviewScope = state.currentView === 'technical_projects_overview' && (state._technicalOverviewProjects && Array.isArray(state._technicalOverviewProjects));
+      let technicalProjects = canUseOverviewScope ? state._technicalOverviewProjects : (state.projects || []);
+
+      // If no explicit scope provided, scope based on current user
+      if (!canUseOverviewScope) {
+        if (state.currentUser && state.currentUser.role === 'admin') {
+          // admin can see all
+        } else if (isTechnicalMahashakhaUser()) {
+          const allowed = MAHASHAKHA_STRUCTURE[MAHASHAKHA.TECHNICAL] || [];
+          technicalProjects = technicalProjects.filter(p => {
+            const s = (p.shakha || '').toString();
+            if (!s) return false;
+            if (allowed.includes(s)) return true;
+            if (s.includes('प्राविधिक')) return true;
+            return false;
+          });
+        } else if (state.currentUser) {
+          // Shakha users (existing behavior)
+          const userShakhaName = (state.currentUser.shakha || '').trim();
+          const userCode = (state.currentUser.id || '').trim();
+          technicalProjects = technicalProjects.filter(p => {
+            const pShakha = (p.shakha || '').trim();
+            return pShakha === userShakhaName || 
+                   pShakha.toLowerCase() === userCode.toLowerCase() ||
+                   SHAKHA[pShakha] === userShakhaName ||
+                   SHAKHA[pShakha.toUpperCase()] === userShakhaName;
+          });
+        }
       }
+
       const active = technicalProjects.filter(p => p.status === 'active').length;
-      const completed = technicalProjects.filter(p => p.status === 'completed').length;
-      const pending = technicalProjects.filter(p => p.status === 'pending').length;
+      const completed = technicalProjects.filter(p => (p.improvementInfo && String(p.improvementInfo).trim() !== '')).length;
+      const pending = technicalProjects.filter(p => (!p.improvementInfo || String(p.improvementInfo).trim() === '')).length;
       
       window.nvcChartsData.projectChart = {
           labels: ['चालु', 'सम्पन्न', 'काम बाँकी'],
@@ -4934,8 +5801,6 @@ function initializeDashboardCharts() {
                     const i = elements[0].index;
                     const label = chart.data.labels[i];
                     const statusMap = { 'चालु': 'active', 'सम्पन्न': 'completed', 'काम बाँकी': 'pending' };
-                    // Note: Projects view doesn't have a simple filter function exposed like showComplaintsView
-                    // So we just show a toast or navigate
                     showTechnicalProjectsView({ status: statusMap[label] });
                 }
             },
@@ -5218,6 +6083,15 @@ function showChartDrillDown(filters, title) {
         });
     }
     
+    // Filter by Ministry/Organization when requested
+    if (filters.ministry) {
+      const wanted = String(filters.ministry).trim();
+      filtered = filtered.filter(c => {
+        const m = (c.ministry || c['मन्त्रालय/निकाय'] || c.organization || c['निकाय'] || '').toString().trim();
+        return m === wanted;
+      });
+    }
+    
     const tableRows = filtered.map(c => `
         <tr>
             <td>${c.id}</td>
@@ -5289,10 +6163,9 @@ function showDashboardView() {
   else if (state.currentUser.role === 'mahashakha') content = showMahashakhaDashboard();
   else if (state.currentUser.permissions?.includes('technical_inspection')) content = showTechnicalDashboard();
   else content = showShakhaDashboard();
-  
-  const contentArea = document.getElementById('contentArea');
-  if (contentArea) contentArea.innerHTML = content;
-  applyDevanagariDigits(contentArea);
+
+  setContentAreaHTML(content);
+  applyDevanagariDigits(document.getElementById('contentArea'));
   
   // Render AI insights if it's an admin dashboard
   if (state.currentUser.role === 'admin') {
@@ -5432,6 +6305,7 @@ function showAdminDashboard() {
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'pending'})"><div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value">${pendingComplaints}</div><div class="stat-label">काम बाँकी</div><span class="stat-trend trend-down"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'resolved'})"><div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value">${resolvedComplaints}</div><div class="stat-label">फछ्रयौट भएका</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView()"><div class="stat-icon bg-secondary"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${monthlyComplaints}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
+      <div class="stat-widget pointer" onclick="showTechnicalProjectsOverview({scope: 'all'})"><div class="stat-icon bg-info"><i class="fas fa-hard-hat"></i></div><div class="stat-info"><div class="stat-value">${(state.projects || []).length}</div><div class="stat-label">प्राविधिक परीक्षण</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
     <div class="card mb-3">
@@ -5445,6 +6319,7 @@ function showAdminDashboard() {
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">शाखा अनुसार उजुरी तुलना</h6>${getChartActionsHTML('shakhaChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="shakhaChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मासिक प्रगति विवरण</h6>${getChartActionsHTML('trendChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="trendChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">शाखा अनुसार फछ्र्यौट दर</h6>${getChartActionsHTML('resolutionRateChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="resolutionRateChart"></canvas></div></div>
+      <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मन्त्रालय/निकाय अनुसार उजुरी</h6>${getChartActionsHTML('adminMinistryChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="adminMinistryChart"></canvas></div></div>
     </div>
     
     <div class="card mb-3">
@@ -5497,8 +6372,13 @@ function showAdminDashboard() {
 }
 
 function showAdminPlanningDashboard() {
-  const helloSarkarComplaints = state.complaints.filter(c => c.source === 'hello_sarkar');
+  const allComplaints = (state.complaints || []).concat(state.onlineComplaints || []);
+  const helloSarkarComplaints = allComplaints.filter(c => String(c.source).toLowerCase() === 'hello_sarkar');
   const pendingHelloSarkar = helloSarkarComplaints.filter(c => c.status === 'pending').length;
+  const onlineComplaints = allComplaints.filter(c => ['online','online_complaint'].includes(String(c.source).toLowerCase()));
+  const onlineTotal = onlineComplaints.length;
+  const onlinePending = onlineComplaints.filter(c => c.status === 'pending').length;
+  const onlineResolved = onlineComplaints.filter(c => c.status === 'resolved').length;
   
   return `
     <div class="search-bar-container mb-3">
@@ -5512,13 +6392,13 @@ function showAdminPlanningDashboard() {
     <div class="stats-grid mb-3">
       <div class="stat-widget pointer" onclick="showAdminComplaintsView()"><div class="stat-icon bg-primary"><i class="fas fa-file-alt"></i></div><div class="stat-info"><div class="stat-value">${helloSarkarComplaints.length}</div><div class="stat-label">हेलो सरकारबाट प्राप्त उजुरी</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showAdminComplaintsView({status: 'pending'})"><div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value">${pendingHelloSarkar}</div><div class="stat-label">काम बाँकी</div><span class="stat-trend trend-down"></span></div></div>
-      <div class="stat-widget pointer" onclick="showEmployeeMonitoringView()"><div class="stat-icon bg-success"><i class="fas fa-user-check"></i></div><div class="stat-info"><div class="stat-value"></div><div class="stat-label">अनुगमन गरिएका</div><span class="stat-trend trend-up"></span></div></div>
-      <div class="stat-widget pointer" onclick="showAdminComplaintsView()"><div class="stat-icon bg-secondary"><i class="fas fa-chart-line"></i></div><div class="stat-info"><div class="stat-value"></div><div class="stat-label">समयमा प्रतिक्रिया</div><span class="stat-trend trend-up"></span></div></div>
+      <div class="stat-widget pointer" onclick="showOnlineComplaintsView()"><div class="stat-icon bg-success"><i class="fas fa-globe"></i></div><div class="stat-info"><div class="stat-value">${onlineTotal}</div><div class="stat-label">अनलाइन उजुरी</div><span class="stat-trend trend-up"></span></div></div>
+      <div class="stat-widget pointer" onclick="showOnlineComplaintsView({status: 'pending'})"><div class="stat-icon bg-secondary"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value">${onlinePending}</div><div class="stat-label">काम बाँकी</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
     <div class="d-grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <div class="card"><div class="card-header"><h6 class="mb-0">हेलो सरकारबाट प्राप्त उजुरी</h6></div><div class="card-body"><div class="d-flex justify-between align-center mb-2"><span class="text-small">कूल उजुरी</span><span class="font-weight-bold">${helloSarkarComplaints.length}</span></div><div class="d-flex justify-between align-center mb-2"><span class="text-small">काम बाँकी</span><span class="font-weight-bold text-warning">${pendingHelloSarkar}</span></div><div class="d-flex justify-between align-center"><span class="text-small">फछ्रयौट</span><span class="font-weight-bold text-success">${helloSarkarComplaints.length - pendingHelloSarkar}</span></div></div></div>
-      <div class="card"><div class="card-header"><h6 class="mb-0">कार्यालय अनुगमन</h6></div><div class="card-body"><div class="d-flex justify-between align-center mb-2"><span class="text-small">आजको अनुगमन</span><span class="font-weight-bold"></span></div><div class="d-flex justify-between align-center mb-2"><span class="text-small">पोशाक अपरिपालना</span><span class="font-weight-bold text-warning">३</span></div><div class="d-flex justify-between align-center"><span class="text-small">समय अपरिपालना</span><span class="font-weight-bold text-danger">२</span></div></div></div>
+      <div class="card"><div class="card-header"><h6 class="mb-0">अनलाइन उजुरी</h6></div><div class="card-body"><div class="d-flex justify-between align-center mb-2"><span class="text-small">कूल अनलाइन उजुरी</span><span class="font-weight-bold">${onlineTotal}</span></div><div class="d-flex justify-between align-center mb-2"><span class="text-small">काम बाँकी</span><span class="font-weight-bold text-warning">${onlinePending}</span></div><div class="d-flex justify-between align-center"><span class="text-small">फछ्रयौट</span><span class="font-weight-bold text-success">${onlineResolved}</span></div></div></div>
     </div>
     
     <div class="card">
@@ -5593,6 +6473,18 @@ function showMahashakhaDashboard() {
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'pending'})"><div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value" id="mahashakhaPending">${pendingComplaints}</div><div class="stat-label">काम बाँकी</div><span class="stat-trend trend-down"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'resolved'})"><div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value" id="mahashakhaResolved">${resolvedComplaints}</div><div class="stat-label">फछ्रयौट भएका</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showComplaintsView()"><div class="stat-icon bg-secondary"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${monthlyComplaints}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
+      ${((state.currentUser && (state.currentUser.mahashakha === MAHASHAKHA.TECHNICAL || state.currentUser.name === MAHASHAKHA.TECHNICAL)) ? (() => {
+          const all = (state.projects || []);
+          const allowed = MAHASHAKHA_STRUCTURE[MAHASHAKHA.TECHNICAL] || [];
+          const scoped = all.filter(p => {
+            const s = (p.shakha || '').toString();
+            if (!s) return false;
+            if (allowed.includes(s)) return true;
+            if (s.includes('प्राविधिक')) return true;
+            return false;
+          });
+          return `<div class="stat-widget pointer" onclick="showTechnicalProjectsOverview({scope: 'technical_mahashakha'})"><div class="stat-icon bg-info pointer" onclick="event.stopPropagation(); showTechnicalProjectsView();"><i class="fas fa-hard-hat"></i></div><div class="stat-info"><div class="stat-value">${scoped.length}</div><div class="stat-label">प्राविधिक परीक्षण</div><span class="stat-trend trend-up"></span></div></div>`;
+        })() : '')}
     </div>
     
     <div class="card mb-3">
@@ -5606,6 +6498,7 @@ function showMahashakhaDashboard() {
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">शाखा अनुसार तुलना</h6>${getChartActionsHTML('shakhaComparisonChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="shakhaComparisonChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मासिक प्रगति विवरण</h6>${getChartActionsHTML('trendChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="trendChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">शाखा अनुसार फछ्र्यौट दर</h6>${getChartActionsHTML('resolutionRateChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="resolutionRateChart"></canvas></div></div>
+      <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मन्त्रालय/निकाय अनुसार उजुरी</h6>${getChartActionsHTML('mahashakhaMinistryChart')}</div><div class="chart-wrapper dashboard-chart-wrapper"><canvas id="mahashakhaMinistryChart"></canvas></div></div>
     </div>
     
     <div class="card mb-3">
@@ -5768,6 +6661,8 @@ function showTechnicalDashboard() {
       <div class="stat-widget pointer" onclick="showComplaintsView({status: 'pending'})"><div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value">${pendingComplaints}</div><div class="stat-label">काम बाँकी</div><span class="stat-trend trend-down"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView()"><div class="stat-icon bg-success"><i class="fas fa-hard-hat"></i></div><div class="stat-info"><div class="stat-value">${technicalProjects.length}</div><div class="stat-label">प्राविधिक परीक्षण/आयोजना अनुगमन</div><span class="stat-trend trend-up"></span></div></div>
       <div class="stat-widget pointer" onclick="showTechnicalProjectsView({status: 'active'})"><div class="stat-icon bg-secondary"><i class="fas fa-tasks"></i></div><div class="stat-info"><div class="stat-value">${activeProjects}</div><div class="stat-label">चालु आयोजना</div><span class="stat-trend trend-up"></span></div></div>
+      <div class="stat-widget pointer" onclick="showTechnicalProjectsView({status: 'completed'})"><div class="stat-icon bg-info"><i class="fas fa-check-circle"></i></div><div class="stat-info"><div class="stat-value">${technicalProjects.filter(p => p.status === 'completed').length}</div><div class="stat-label">सम्पन्न आयोजना</div><span class="stat-trend trend-up"></span></div></div>
+      <div class="stat-widget" onclick="showTechnicalProjectsView({monthly: true})"><div class="stat-icon bg-warning"><i class="fas fa-calendar-alt"></i></div><div class="stat-info"><div class="stat-value">${getCurrentNepaliMonth()}</div><div class="stat-label">यस महिनाका</div><span class="stat-trend trend-up"></span></div></div>
     </div>
     
     <div class="card mb-3">
@@ -5873,6 +6768,7 @@ function showShakhaDashboard() {
     <div class="d-grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">उजुरी स्थिति</h6>${getChartActionsHTML('complaintStatusChart')}</div><div class="chart-wrapper"><canvas id="complaintStatusChart"></canvas></div></div>
       <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मासिक प्रगति विवरण</h6>${getChartActionsHTML('trendChart')}</div><div class="chart-wrapper"><canvas id="trendChart"></canvas></div></div>
+      <div class="chart-container"><div class="chart-header d-flex justify-between align-center"><h6 class="chart-title">मन्त्रालय/निकाय अनुसार उजुरी</h6>${getChartActionsHTML('shakhaMinistryChart')}</div><div class="chart-wrapper"><canvas id="shakhaMinistryChart"></canvas></div></div>
     </div>
     
     <div class="card">
@@ -5949,6 +6845,7 @@ function showComplaintsView(initialFilters = {}) {
   const shakhaFilter = initialFilters.shakha || '';
   const searchField = initialFilters.searchField || 'all';
   const searchFilter = (initialFilters.search || '').toLowerCase();
+  const ministryFilter = initialFilters.ministry || '';
   const startDate = initialFilters.startDate || '';
   const endDate = initialFilters.endDate || '';
   const sortOrder = initialFilters.sortOrder || 'newest';
@@ -5965,6 +6862,12 @@ function showComplaintsView(initialFilters = {}) {
   if (shakhaFilter) {
       complaintsToShow = complaintsToShow.filter(c => (c.shakha || '') === shakhaFilter);
   }
+    if (ministryFilter) {
+      complaintsToShow = complaintsToShow.filter(c => {
+        const m = (c.ministry || c['मन्त्रालय/निकाय'] || '').toString();
+        return m === ministryFilter;
+      });
+    }
 
   if (startDate || endDate) {
       complaintsToShow = complaintsToShow.filter(c => {
@@ -5983,6 +6886,7 @@ function showComplaintsView(initialFilters = {}) {
         if (searchField === 'complainant') return String(c.complainant).toLowerCase().includes(searchFilter);
         if (searchField === 'accused') return String(c.accused || '').toLowerCase().includes(searchFilter);
         if (searchField === 'description') return String(c.description).toLowerCase().includes(searchFilter);
+        if (searchField === 'ministry') return String(c.ministry || c['मन्त्रालय/निकाय'] || '').toLowerCase().includes(searchFilter);
         // Default: All fields
         return JSON.stringify(c).toLowerCase().includes(searchFilter);
     });
@@ -6037,7 +6941,7 @@ function showComplaintsView(initialFilters = {}) {
   let tableRows = '';
   
   if (paginatedComplaints.length === 0) {
-    tableRows = `<tr><td colspan="11" class="text-center p-4">कुनै उजुरी फेला परेन</td></tr>`;
+    tableRows = `<tr><td colspan="12" class="text-center p-4">कुनै उजुरी फेला परेन</td></tr>`;
   } else {
     paginatedComplaints.forEach(complaint => {
       // सबै fields लिने - विभिन्न सम्भावित नामहरू
@@ -6063,6 +6967,7 @@ function showComplaintsView(initialFilters = {}) {
       const accused = complaint.accused || 
                       complaint['विपक्षी'] || 
                       '-';
+      const ministry = complaint.ministry || complaint['मन्त्रालय/निकाय'] || '-';
       
       const description = complaint.description || 
                           complaint['उजुरीको संक्षिप्त विवरण'] || 
@@ -6108,6 +7013,7 @@ function showComplaintsView(initialFilters = {}) {
           <td data-label="मिति">${date} ${priorityBadge}</td>
           <td data-label="उजुरकर्ता">${complainant}</td>
           <td data-label="विपक्षी">${accused}</td>
+          <td data-label="मन्त्रालय/निकाय">${ministry}</td>
           <td data-label="उजुरीको विवरण" title="${description}">${fullDescription}</td>
           <td data-label="समितिको निर्णय" title="${complaint.committeeDecision || ''}">${fullCommittee}</td>
           <td data-label="अन्तिम निर्णय" title="${decision || ''}">${fullDecision}</td>
@@ -6127,6 +7033,18 @@ function showComplaintsView(initialFilters = {}) {
   
   // पेजिनेसन HTML
   const paginationHTML = renderPagination(totalItems, itemsPerPage, currentPage);
+
+  const chipsHTML = buildComplaintsFilterChipsHTML({
+    status: statusFilter,
+    finalDecisionType: finalDecisionTypeFilter,
+    shakha: shakhaFilter,
+    ministry: ministryFilter,
+    searchField,
+    search: searchFilter,
+    sortOrder,
+    startDate,
+    endDate
+  });
   
   // Generate Shakha Options
   let shakhaOptions = '<option value="">शाखा (सबै)</option>';
@@ -6144,6 +7062,8 @@ function showComplaintsView(initialFilters = {}) {
             <i class="fas fa-chevron-down"></i>
           </button>
       </div>
+
+      ${chipsHTML ? `<div class="w-100 mb-2">${chipsHTML}</div>` : ''}
       
       <div id="filterContent" class="w-100 d-none d-md-block">
           <div class="filter-grid">
@@ -6188,6 +7108,10 @@ function showComplaintsView(initialFilters = {}) {
                     <select class="form-select form-select-sm" id="filterShakha" style="min-width: 120px;">
                         ${shakhaOptions}
                     </select>
+                    <select class="form-select form-select-sm" id="filterMinistry" style="min-width: 180px;">
+                      <option value="">मन्त्रालय/निकाय (सबै)</option>
+                      ${MINISTRIES.map(m => `<option value="${m}" ${ministryFilter === m ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
                 </div>
             </div>
 
@@ -6206,8 +7130,9 @@ function showComplaintsView(initialFilters = {}) {
                             <option value="complainant" ${searchField === 'complainant' ? 'selected' : ''}>उजुरकर्ता</option>
                             <option value="accused" ${searchField === 'accused' ? 'selected' : ''}>विपक्षी</option>
                             <option value="description" ${searchField === 'description' ? 'selected' : ''}>विवरण</option>
+                            <option value="ministry" ${searchField === 'ministry' ? 'selected' : ''}>मन्त्रालय/निकाय</option>
                         </select>
-                        <input type="text" class="form-control" placeholder="खोज्नुहोस्..." id="searchText" value="${searchFilter}" onkeyup="if(event.key === 'Enter') filterComplaintsTable()">
+                        <input type="text" class="form-control" placeholder="खोज्नुहोस्..." id="searchText" value="${searchFilter}" oninput="debouncedFilterComplaintsTable()" onkeyup="if(event.key === 'Enter') filterComplaintsTable()">
                     </div>
                 </div>
             </div>
@@ -6256,6 +7181,7 @@ function showComplaintsView(initialFilters = {}) {
                 <th>मिति</th>
                 <th>उजुरकर्ता</th>
                 <th>विपक्षी</th>
+                <th>मन्त्रालय/निकाय</th>
                 <th>उजुरीको विवरण</th>
                 <th>समितिको निर्णय</th>
                 <th>अन्तिम निर्णय</th>
@@ -6282,9 +7208,9 @@ function showComplaintsView(initialFilters = {}) {
   
   const contentArea = document.getElementById('contentArea');
   if (contentArea) {
-    contentArea.innerHTML = content;
+    setContentAreaHTML(content);
     console.log('✅ Content area updated');
-    applyDevanagariDigits(contentArea);
+    applyDevanagariDigits(document.getElementById('contentArea'));
     
     // If filters were provided from the UI's filter action, avoid re-triggering
     // filterComplaintsTable to prevent a render loop. filterComplaintsTable will
@@ -6296,6 +7222,13 @@ function showComplaintsView(initialFilters = {}) {
     // Rely on the centralized delegated handler in setupEventListeners() for action buttons
   }
   updateActiveNavItem();
+  // If admin or mahashakha opened the complaints view, mark new entries as seen
+  try {
+    if (state.currentUser && (state.currentUser.role === 'admin' || state.currentUser.role === 'mahashakha')) {
+      // mark seen asynchronously (no await to avoid blocking UI)
+      markSeenNewEntries().catch(e => console.error('markSeenNewEntries failed', e));
+    }
+  } catch (e) { console.error(e); }
 }
 
 function renderPagination(totalItems, itemsPerPage, currentPage) {
@@ -6442,6 +7375,441 @@ function showAllComplaintsView() {
   updateActiveNavItem();
 }
 
+function showOnlineComplaintsView(initialFilters = {}) {
+  console.log('showOnlineComplaintsView - Starting...');
+  state.currentView = 'online_complaints';
+  document.getElementById('pageTitle').textContent = 'अनलाइन उजुरी';
+
+  if (!state.onlineComplaints) state.onlineComplaints = [];
+
+  // Lazy-load from Google Sheet for admin_planning
+  if (GOOGLE_SHEETS_CONFIG.ENABLED && state.currentUser?.role === 'admin_planning' && !state._onlineComplaintsLoaded) {
+    console.log('showOnlineComplaintsView - Loading from sheets...');
+    state._onlineComplaintsLoaded = true;
+    showLoadingIndicator(true);
+    loadOnlineComplaintsFromSheets().finally(() => {
+      showLoadingIndicator(false);
+      console.log('showOnlineComplaintsView - Load completed, re-rendering...');
+      // Re-render after load
+      try { showOnlineComplaintsView(initialFilters); } catch (e) {}
+    });
+    return; // Exit early, will re-render after load
+  }
+
+  const onlineComplaints = (state.onlineComplaints || []).slice();
+  console.log('showOnlineComplaintsView - Rendering ' + onlineComplaints.length + ' complaints');
+
+  const content = `
+    <div class="filter-bar mb-3">
+      <div class="filter-group"><label class="filter-label">स्थिति:</label><select class="form-select form-select-sm" id="filterOnlineStatus"><option value="">सबै</option><option value="pending" ${initialFilters.status === 'pending' ? 'selected' : ''}>काम बाँकी</option><option value="progress">चालु</option><option value="resolved">फछ्रयौट</option></select></div>
+      <div class="filter-group"><input type="text" class="form-control form-control-sm" placeholder="खोज्नुहोस्..." id="searchOnlineText" value="${initialFilters.search || ''}" /></div>
+      <button class="btn btn-primary btn-sm" onclick="filterOnlineComplaints()">खोज्नुहोस्</button>
+      <button class="btn btn-success btn-sm" onclick="exportToExcel('online')"><i class="fas fa-file-excel"></i> Excel</button>
+    </div>
+    
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">अनलाइन उजुरी सूची</h5></div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table">
+            <thead><tr><th>क्र.सं.</th><th>मिति</th><th>उजुरकर्ता</th><th>विपक्षी</th><th>उजुरीको विवरण</th><th>सम्बन्धित शाखा</th><th>शाखामा पठाएको मिति</th><th>निर्णय</th><th>कैफियत</th><th>कार्य</th></tr></thead>
+            <tbody id="onlineComplaintsTable">
+              ${onlineComplaints.map((complaint, index) => `
+                <tr class="${getComplaintAgeClass(complaint)}">
+                  <td data-label="क्र.सं.">${index + 1}</td><td data-label="मिति">${complaint.date}</td><td data-label="उजुरकर्ता">${complaint.complainant}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
+                  <td data-label="उजुरीको विवरण" class="text-limit" title="${complaint.description || ''}">${(complaint.description || '-').toString().substring(0, 50)}...</td>
+                  <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha) || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
+                  <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.toString().substring(0, 30) + '...' : '-'}</td>
+                  <td data-label="कैफियत">${complaint.remarks || '-'}</td>
+                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-func="viewOnlineComplaint" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-func="assignOnlineComplaint" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" data-action="edit" data-func="editOnlineComplaint" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
+  if (initialFilters.status || initialFilters.search) {
+    setTimeout(filterOnlineComplaints, 100);
+  }
+  updateActiveNavItem();
+}
+
+async function loadOnlineComplaintsFromSheets() {
+  console.log('loadOnlineComplaintsFromSheets - Starting...');
+  if (!GOOGLE_SHEETS_CONFIG.ENABLED) {
+    console.log('loadOnlineComplaintsFromSheets - Google Sheets disabled');
+    return { success: true, data: state.onlineComplaints || [], local: true };
+  }
+  try {
+    console.log('loadOnlineComplaintsFromSheets - Calling getOnlineComplaints API...');
+    const res = await getFromGoogleSheets('getOnlineComplaints');
+    console.log('loadOnlineComplaintsFromSheets - API response:', res);
+    
+    if (res.success) {
+      // Clear old data and replace with fresh data from server
+      state.onlineComplaints = res.data || [];
+      console.log('loadOnlineComplaintsFromSheets - Loaded ' + state.onlineComplaints.length + ' complaints');
+      
+      // Ensure each complaint has a date field in BS format and is visible
+      state.onlineComplaints.forEach((complaint, index) => {
+        // Only convert AD to BS if date field is missing AND created_at exists
+        if (!complaint.date && complaint.created_at) {
+          // Convert created_at to BS date if date field is missing
+          const createdDate = new Date(complaint.created_at);
+          const adDateStr = createdDate.toISOString().split('T')[0];
+          complaint.date = convertADtoBSAccurate(adDateStr);
+        }
+        
+        // Clean up date fields - remove time part
+        if (complaint.date && typeof complaint.date === 'string') {
+          // Debug: Log original date from sheet
+          console.log('Complaint ' + index + ' - Original date from sheet:', complaint.date);
+          
+          // Handle timezone issue: If date has time with Z (UTC), convert to local date first
+          if (complaint.date.includes('T') && complaint.date.includes('Z')) {
+            // Parse the UTC date and convert to local date string
+            const utcDate = new Date(complaint.date);
+            // Get local date in YYYY-MM-DD format
+            const localDateStr = utcDate.getFullYear() + '-' + 
+                               String(utcDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(utcDate.getDate()).padStart(2, '0');
+            complaint.date = localDateStr;
+            console.log('Complaint ' + index + ' - After timezone correction:', complaint.date);
+          } else if (complaint.date.includes('T') || complaint.date.includes(' ')) {
+            // Simple split for non-UTC dates
+            complaint.date = complaint.date.split('T')[0].split(' ')[0];
+          }
+          
+          // Debug: Log final date after cleanup
+          console.log('Complaint ' + index + ' - Final date after cleanup:', complaint.date);
+        }
+        
+        // IMPORTANT: Don't convert existing BS dates - they're already in correct format
+        // The sheet already contains BS dates, so we should use them as-is
+        
+        // Clean up assignedDate field - remove time part
+        if (complaint.assignedDate && typeof complaint.assignedDate === 'string') {
+          // If assignedDate contains time, extract only the date part
+          if (complaint.assignedDate.includes('T') || complaint.assignedDate.includes(' ')) {
+            complaint.assignedDate = complaint.assignedDate.split('T')[0].split(' ')[0];
+          }
+        }
+        
+        // Ensure complaint is visible in UI
+        complaint.visible = true;
+        // Ensure source is marked so counts include these records
+        complaint.source = complaint.source || 'online';
+        console.log('Complaint ' + index + ':', complaint.id, complaint.date);
+      });
+    } else {
+      console.error('loadOnlineComplaintsFromSheets - API failed:', res.message);
+    }
+    return { success: true, data: state.onlineComplaints || [], local: false };
+  } catch (e) {
+    console.error('loadOnlineComplaintsFromSheets error', e);
+    return { success: false, data: [], message: e.toString() };
+  }
+}
+
+function normalizeOnlineComplaintRow(row) {
+  const r = row || {};
+  const id = r.id || r.ID || r['उजुरी दर्ता नं'] || r['id'] || '';
+  
+  // Convert AD date to BS for display
+  let displayDate = r.date || r.Date || r['मिति'] || '';
+  let bsDate = '';
+  if (displayDate) {
+    // Try to convert AD to BS
+    try {
+      bsDate = convertADtoBS(displayDate);
+      if (bsDate && bsDate !== displayDate) {
+        displayDate = bsDate; // Use BS date for display
+      }
+    } catch (e) {
+      console.warn('Date conversion failed for online complaint:', displayDate, e);
+    }
+  }
+  
+  return {
+    id: id,
+    date: displayDate, // Now in BS
+    _originalDate: r.date || r.Date || r['मिति'] || '', // Keep original AD for reference
+    complainant: r.complainant || r.name || r['उजुरकर्ता'] || '',
+    phone: r.phone || r.mobile || r['फोन'] || '',
+    email: r.email || r['इमेल'] || '',
+    province: r.province || r['प्रदेश'] || '',
+    district: r.district || r['जिल्ला'] || '',
+    localLevel: r.localLevel || r.local_level || r.locality || r['स्थानीय तह'] || '',
+    ward: r.ward || r['वडा'] || '',
+    ministry: r.ministry || r.organization || r['मन्त्रालय/निकाय'] || '',
+    accused: r.accused || r['विपक्षी'] || '',
+    description: r.description || r['उजुरीको विवरण'] || r['उजुरीको संक्षिप्त विवरण'] || '',
+    status: r.status || 'pending',
+    assignedShakha: r.assignedShakha || r.shakha || '',
+    assignedShakhaCode: r.assignedShakhaCode || r.shakhaCode || '',
+    assignedDate: r.assignedDate || '',
+    instructions: r.instructions || '',
+    remarks: r.remarks || r.remark || '',
+    created_at: r.created_at || r.createdAt || '',
+    updated_at: r.updated_at || r.updatedAt || ''
+  };
+}
+
+function filterOnlineComplaints() {
+  const status = (document.getElementById('filterOnlineStatus')?.value || '').trim();
+  const search = (document.getElementById('searchOnlineText')?.value || '').toLowerCase().trim();
+  let list = (state.onlineComplaints || []).slice();
+
+  if (status) list = list.filter(c => String(c.status || '').toLowerCase() === status);
+  if (search) {
+    list = list.filter(c => {
+      const text = `${c.id} ${c.complainant} ${c.phone} ${c.email} ${c.accused} ${c.description} ${c.ministry}`.toLowerCase();
+      return text.includes(search);
+    });
+  }
+
+  const tbody = document.getElementById('onlineComplaintsTable');
+  if (!tbody) return;
+  tbody.innerHTML = list.map((complaint, index) => `
+    <tr class="${getComplaintAgeClass(complaint)}">
+      <td data-label="क्र.सं.">${index + 1}</td><td data-label="मिति">${complaint.date || '-'}</td><td data-label="उजुरकर्ता">${complaint.complainant || '-'}</td><td data-label="विपक्षी">${complaint.accused || '-'}</td>
+      <td data-label="उजुरीको विवरण" class="text-limit" title="${complaint.description || ''}">${(complaint.description || '').substring(0, 50)}...</td>
+      <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha) || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
+      <td data-label="निर्णय">-</td>
+      <td data-label="कैफियत">${complaint.remarks || '-'}</td>
+      <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-func="viewOnlineComplaint" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-func="assignOnlineComplaint" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" data-action="edit" data-func="editOnlineComplaint" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
+    </tr>
+  `).join('') || `<tr><td colspan="10" class="text-center text-muted p-4">डाटा उपलब्ध छैन</td></tr>`;
+}
+
+function viewOnlineComplaint(id) {
+  const c = (state.onlineComplaints || []).find(x => String(x.id) === String(id));
+  if (!c) return;
+  const content = `
+    <div class="d-grid gap-2">
+      <div><strong>मिति:</strong> ${c.date || '-'}</div>
+      <div><strong>उजुरकर्ता:</strong> ${c.complainant || '-'}</div>
+      <div><strong>फोन:</strong> ${c.phone || '-'}</div>
+      <div><strong>इमेल:</strong> ${c.email || '-'}</div>
+      <div><strong>प्रदेश/जिल्ला:</strong> ${c.province || '-'} / ${c.district || '-'}</div>
+      <div><strong>स्थानीय तह/वडा:</strong> ${c.localLevel || '-'} / ${c.ward || '-'}</div>
+      <div><strong>मन्त्रालय/निकाय:</strong> ${c.ministry || '-'}</div>
+      <div><strong>विपक्षी:</strong> ${c.accused || '-'}</div>
+      <div><strong>विवरण:</strong><div class="mt-1">${(c.description || '').replace(/\n/g, '<br>')}</div></div>
+      <div><strong>सम्बन्धित शाखा:</strong> ${displayShakhaName(c.assignedShakha) || '-'}</div>
+      <div><strong>शाखामा पठाएको मिति:</strong> ${c.assignedDate || '-'}</div>
+      <div><strong>कैफियत:</strong> ${(c.remarks || '-').toString().replace(/\n/g, '<br>')}</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">बन्द गर्नुहोस्</button></div>
+  `;
+  openModal('अनलाइन उजुरी विवरण', content);
+}
+
+function editOnlineComplaint(id) {
+  const c = (state.onlineComplaints || []).find(x => String(x.id) === String(id));
+  if (!c) return;
+  const form = `
+    <div class="d-grid gap-3">
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="form-group"><label class="form-label">उजुरी नं</label><input type="text" class="form-control" id="oc_id" value="${c.id || ''}" readonly /></div>
+        <div class="form-group"><label class="form-label">मिति</label><input type="text" class="form-control" id="oc_date" value="${c.date || ''}" /></div>
+      </div>
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="form-group"><label class="form-label">उजुरकर्ता</label><input type="text" class="form-control" id="oc_complainant" value="${c.complainant || ''}" /></div>
+        <div class="form-group"><label class="form-label">फोन</label><input type="text" class="form-control" id="oc_phone" value="${c.phone || ''}" /></div>
+      </div>
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="form-group"><label class="form-label">इमेल</label><input type="text" class="form-control" id="oc_email" value="${c.email || ''}" /></div>
+        <div class="form-group"><label class="form-label">मन्त्रालय/निकाय</label>
+          <select class="form-select" id="oc_ministry">
+            <option value="">छनौट गर्नुहोस्</option>
+            ${MINISTRIES.map(min => `<option value="${min}" ${c.ministry === min ? 'selected' : ''}>${min}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="form-group"><label class="form-label">प्रदेश</label>
+          <select class="form-select" id="oc_province" onchange="loadOcDistricts()">
+            <option value="">प्रदेश छन्नुहोस्</option>
+            ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) => `<option value="${key}" ${(c.province === key || c.province === value) ? 'selected' : ''}>${value}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">जिल्ला</label>
+          <select class="form-select" id="oc_district" ${!c.province ? 'disabled' : ''} onchange="loadOcLocals()">
+            <option value="">जिल्ला छन्नुहोस्</option>
+            ${(() => { const pk = Object.entries(LOCATION_FIELDS.PROVINCE).find(([k,v]) => c.province === k || c.province === v); return pk && LOCATION_FIELDS.DISTRICTS[pk[0]] ? LOCATION_FIELDS.DISTRICTS[pk[0]].map(dist => `<option value="${dist}" ${c.district === dist ? 'selected' : ''}>${dist}</option>`).join('') : ''; })()}
+          </select>
+        </div>
+      </div>
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="form-group"><label class="form-label">स्थानीय तह</label>
+          <select class="form-select" id="oc_localLevel" data-selected="${c.localLevel || ''}">
+            <option value="">पहिला जिल्ला छान्नुहोस्</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">वडा</label><input type="text" class="form-control" id="oc_ward" value="${c.ward || ''}" /></div>
+      </div>
+      <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div class="form-group"><label class="form-label">विपक्षी</label><input type="text" class="form-control" id="oc_accused" value="${c.accused || ''}" /></div>
+        <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="oc_status"><option value="pending" ${String(c.status||'').toLowerCase()==='pending'?'selected':''}>काम बाँकी</option><option value="progress" ${String(c.status||'').toLowerCase()==='progress'?'selected':''}>चालु</option><option value="resolved" ${String(c.status||'').toLowerCase()==='resolved'?'selected':''}>फछ्रयौट</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">उजुरीको विवरण</label><textarea class="form-control" rows="4" id="oc_description">${c.description || ''}</textarea></div>
+      <div class="form-group"><label class="form-label">कैफियत</label><textarea class="form-control" rows="2" id="oc_remarks">${c.remarks || ''}</textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द</button><button class="btn btn-primary" onclick="saveOnlineComplaintEdit('${c.id}')">सुरक्षित</button></div>
+  `;
+  openModal('अनलाइन उजुरी सम्पादन', form);
+  setTimeout(() => { initializeDatepickers(); initializeNepaliDropdowns(); loadOcDistricts(); }, 100);
+}
+
+async function saveOnlineComplaintEdit(id) {
+  const idx = (state.onlineComplaints || []).findIndex(x => String(x.id) === String(id));
+  if (idx === -1) return;
+
+  const payload = {
+    id,
+    date: document.getElementById('oc_date')?.value || '',
+    complainant: document.getElementById('oc_complainant')?.value || '',
+    phone: document.getElementById('oc_phone')?.value || '',
+    email: document.getElementById('oc_email')?.value || '',
+    ministry: document.getElementById('oc_ministry')?.value || '',
+    province: document.getElementById('oc_province')?.value || '',
+    district: document.getElementById('oc_district')?.value || '',
+    localLevel: document.getElementById('oc_localLevel')?.value || '',
+    ward: document.getElementById('oc_ward')?.value || '',
+    accused: document.getElementById('oc_accused')?.value || '',
+    status: document.getElementById('oc_status')?.value || 'pending',
+    description: document.getElementById('oc_description')?.value || '',
+    remarks: document.getElementById('oc_remarks')?.value || '',
+    updated_at: new Date().toISOString()
+  };
+
+  showLoadingIndicator(true);
+  let res = { success: true, local: true };
+  if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+    res = await postToGoogleSheets('updateOnlineComplaint', payload);
+  }
+  showLoadingIndicator(false);
+
+  state.onlineComplaints[idx] = { ...state.onlineComplaints[idx], ...payload };
+  showToast(res && res.success ? 'अनलाइन उजुरी अपडेट भयो' : 'अनलाइन उजुरी Local मात्र अपडेट भयो', res && res.success ? 'success' : 'warning');
+  closeModal();
+  showOnlineComplaintsView();
+}
+
+function assignOnlineComplaint(id) {
+  const c = (state.onlineComplaints || []).find(x => String(x.id) === String(id));
+  if (!c) return;
+
+  const currentDate = getCurrentNepaliDate();
+  const formContent = `
+    <div class="d-grid gap-3">
+      <div class="form-group"><label class="form-label">उजुरी नं</label><input type="text" class="form-control" value="${c.id}" readonly /></div>
+      <div class="form-group"><label class="form-label">शाखा *</label><select class="form-select" id="assignOnlineShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => {
+        const isSelected = (c.assignedShakha === key) || (c.assignedShakha === value);
+        return `<option value="${key}" ${isSelected ? 'selected' : ''}>${value}</option>`;
+      }).join('')}</select></div>
+      <div class="form-group"><label class="form-label">पठाएको मिति *</label>
+        <div class="d-flex gap-2 nepali-datepicker-dropdown" data-target="assignOnlineDate">
+          <select id="assignOnlineDate_year" class="form-select bs-year"><option value="">साल</option></select>
+          <select id="assignOnlineDate_month" class="form-select bs-month"><option value="">महिना</option></select>
+          <select id="assignOnlineDate_day" class="form-select bs-day"><option value="">गते</option></select>
+          <input type="hidden" id="assignOnlineDate" value="${currentDate}" />
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">सन्देश</label><textarea class="form-control" rows="3" id="assignOnlineInstructions" placeholder="शाखालाई दिने सन्देश"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveOnlineShakhaAssignment('${id}')">पठाउनुहोस्</button></div>
+  `;
+  openModal('अनलाइन उजुरी शाखामा पठाउनुहोस्', formContent);
+  setTimeout(()=>{ initializeDatepickers(); initializeNepaliDropdowns(); }, 100);
+}
+
+async function saveOnlineShakhaAssignment(id) {
+  const idx = (state.onlineComplaints || []).findIndex(x => String(x.id) === String(id));
+  if (idx === -1) return;
+
+  const assignedShakhaCode = document.getElementById('assignOnlineShakha')?.value || '';
+  const assignDate = document.getElementById('assignOnlineDate')?.value || '';
+  const instructions = document.getElementById('assignOnlineInstructions')?.value || '';
+
+  if (!assignedShakhaCode || !assignDate) {
+    showToast('कृपया शाखा र मिति छान्नुहोस्', 'warning');
+    return;
+  }
+
+  showLoadingIndicator(true);
+  const assignedShakhaName = SHAKHA[assignedShakhaCode] || assignedShakhaCode;
+
+  const onlineUpdate = {
+    id,
+    assignedShakha: assignedShakhaName,
+    assignedShakhaCode,
+    assignedDate: assignDate,
+    instructions,
+    status: 'progress',
+    updated_at: new Date().toISOString()
+  };
+
+  let onlineRes = { success: true, local: true };
+  if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+    onlineRes = await postToGoogleSheets('updateOnlineComplaint', onlineUpdate);
+  }
+
+  // Upsert into main Complaints so shakha view sees it
+  const c = state.onlineComplaints[idx];
+  const complaintPayload = {
+    id: id,
+    date: c.date || getCurrentNepaliDate(),
+    complainant: c.complainant || '',
+    accused: c.accused || '',
+    ministry: c.ministry || '',
+    description: c.description || '',
+    remarks: c.remarks || '',
+    province: c.province || '',
+    district: c.district || '',
+    localLevel: c.localLevel || '',
+    status: 'progress',
+    assignedShakha: assignedShakhaName,
+    assignedShakhaCode,
+    assignedDate: assignDate,
+    instructions: instructions || '',
+    shakha: assignedShakhaName,
+    mahashakha: MAHASHAKHA.ADMIN_MONITORING,
+    source: 'online',
+    updatedBy: state.currentUser?.name || ''
+  };
+
+  let complRes = { success: true, local: true };
+  if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+    complRes = await postToGoogleSheets('updateComplaint', complaintPayload);
+  }
+
+  // Update local caches
+  state.onlineComplaints[idx] = { ...state.onlineComplaints[idx], ...onlineUpdate };
+  if (!state.complaints) state.complaints = [];
+  const mainIdx = state.complaints.findIndex(x => String(x.id) === String(id));
+  if (mainIdx !== -1) state.complaints[mainIdx] = { ...state.complaints[mainIdx], ...complaintPayload };
+  else state.complaints.push({ ...complaintPayload, syncedToSheets: !!(complRes && complRes.success) });
+
+  // Increment new-forwarded count for the assigned shakha so badge displays
+  try {
+    if (!state.shakhaNewCounts) state.shakhaNewCounts = {};
+    const key = assignedShakhaCode || assignedShakhaName || '';
+    state.shakhaNewCounts[key] = (state.shakhaNewCounts[key] || 0) + 1;
+  } catch (e) { console.warn('Could not increment shakhaNewCounts', e); }
+
+  showLoadingIndicator(false);
+  showToast((onlineRes && onlineRes.success) ? 'उजुरी शाखामा पठाइयो' : 'उजुरी शाखामा पठाइयो (Local मात्र)', (onlineRes && onlineRes.success) ? 'success' : 'warning');
+  closeModal();
+  showOnlineComplaintsView();
+}
+
 function showAdminComplaintsView(initialFilters = {}) {
   state.currentView = 'admin_complaints';
   document.getElementById('pageTitle').textContent = 'हेलो सरकारबाट प्राप्त उजुरीहरू';
@@ -6472,7 +7840,7 @@ function showAdminComplaintsView(initialFilters = {}) {
                   <td data-label="सम्बन्धित शाखा">${displayShakhaName(complaint.assignedShakha) || '-'}</td><td data-label="शाखामा पठाएको मिति">${complaint.assignedDate || '-'}</td>
                   <td data-label="निर्णय" class="text-limit" title="${complaint.decision || ''}">${complaint.decision ? complaint.decision.substring(0, 30) + '...' : '-'}</td>
                   <td data-label="कैफियत">${complaint.remarks || '-'}</td>
-                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button></div></td>
+                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="view" data-id="${complaint.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="assign" data-id="${complaint.id}" title="शाखामा पठाउनुहोस्"><i class="fas fa-paper-plane"></i></button><button class="action-btn" data-action="edit" data-id="${complaint.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -6532,6 +7900,12 @@ function showNewComplaintView() {
           </div>
           <div class="form-group"><label class="form-label">उजुरकर्ताको नाम *</label><input type="text" class="form-control" id="complainantName" placeholder="पूरा नाम" /></div>
           <div class="form-group"><label class="form-label">विपक्षी</label><input type="text" class="form-control" id="accusedName" placeholder="विपक्षीको नाम" /></div>
+          <div class="form-group"><label class="form-label">मन्त्रालय/निकाय</label>
+            <select class="form-select" id="complaintMinistry">
+              <option value="">छान्नुहोस्</option>
+              ${MINISTRIES.map(m => `<option value="${m}">${m}</option>`).join('')}
+            </select>
+          </div>
           ${state.currentUser.role === 'admin' ? `
           <div class="form-group"><label class="form-label">सम्बन्धित शाखा</label>
             <select class="form-select" id="complaintShakha">
@@ -6555,13 +7929,15 @@ function showNewComplaintView() {
               </div>
               <div class="form-group">
                 <label class="form-label">जिल्ला</label>
-                <select class="form-select" id="complaintDistrict" disabled>
+                <select class="form-select" id="complaintDistrict" disabled onchange="loadComplaintLocals()">
                   <option value="">पहिला प्रदेश छान्नुहोस्</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">स्थानीय तह / नगर</label>
-                <input type="text" class="form-control" id="complaintLocation" placeholder="जस्तै: काठमाडौं महानगरपालिका">
+                <select class="form-select" id="complaintLocal" disabled>
+                  <option value="">पहिला जिल्ला छान्नुहोस्</option>
+                </select>
               </div>
             </div>
           </div>
@@ -6614,6 +7990,38 @@ function showNewComplaintView() {
   document.getElementById('contentArea').innerHTML = content;
   applyDevanagariDigits(document.getElementById('contentArea'));
   updateActiveNavItem();
+
+  // --- Auto-save Draft Functionality ---
+  const formFields = ['complaintId', 'complaintDate', 'complainantName', 'accusedName', 'complaintDescription', 'committeeDecision', 'complaintRemarks'];
+  const form = document.querySelector('#contentArea .card-body');
+
+  // Function to save draft
+  const saveDraft = () => {
+    const draft = {};
+    formFields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) draft[id] = el.value;
+    });
+    localStorage.setItem('nvc_complaint_draft', JSON.stringify(draft));
+  };
+
+  // Function to load draft
+  const loadDraft = () => {
+    const savedDraft = localStorage.getItem('nvc_complaint_draft');
+    if (savedDraft) {
+      if (confirm('तपाईंको पहिलेको अधुरो फारम भेटियो। के तपाईं त्यसलाई लोड गर्न चाहनुहुन्छ?')) {
+        const draft = JSON.parse(savedDraft);
+        formFields.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && draft[id]) {
+            el.value = draft[id];
+            el.dispatchEvent(new Event('input')); // Trigger input event for counters etc.
+          }
+        });
+      }
+    }
+  };
+  // --- End of Auto-save ---
   
   setTimeout(() => {
     initializeDatepickers(); initializeNepaliDropdowns();
@@ -6621,6 +8029,12 @@ function showNewComplaintView() {
     // Date validation
     const dateInput = document.getElementById('complaintDate');
     if (dateInput) {
+        // Attach auto-save listener
+        if (form) {
+          form.addEventListener('input', saveDraft);
+          loadDraft(); // Check for draft on load
+        }
+
         const checkDate = () => {
             const val = dateInput.value;
             const cur = getCurrentNepaliDate();
@@ -6812,7 +8226,13 @@ async function saveHelloSarkarComplaint() {
   showLoadingIndicator(false);
   showToast(result.success ? 'उजुरी Google Sheet मा सुरक्षित गरियो' : 'उजुरी Local मा सुरक्षित गरियो', result.success ? 'success' : 'warning');
   closeModal();
-  showAdminComplaintsView();
+  if (state.currentView === 'online_complaints') {
+    showOnlineComplaintsView();
+  } else if (state.currentView === 'admin_complaints') {
+    showAdminComplaintsView();
+  } else {
+    showComplaintsView();
+  }
 }
 
 async function autoAssignHelloSarkarComplaints() {
@@ -6918,6 +8338,7 @@ async function saveShakhaAssignment(id) {
     assignedShakha: assignedShakhaName,
     assignedDate: assignDate,
     instructions: instructions || '',
+    shakha: assignedShakhaName,
     status: 'progress',
     syncedToSheets: result && result.success
   };
@@ -6935,13 +8356,164 @@ async function saveShakhaAssignment(id) {
   showAdminComplaintsView();
 }
 
-function showTechnicalProjectsView() {
+function showTechnicalProjectsChart() {
+  // Backward compatibility (existing call sites). The new UX shows chart + data together.
+  showTechnicalProjectsOverview({ scope: 'all' });
+}
+
+function showTechnicalProjectsOverview(options = {}) {
+  state.currentView = 'technical_projects_overview';
+  document.getElementById('pageTitle').textContent = 'प्राविधिक परीक्षण';
+
+  const scope = options.scope || 'all';
+
+  // Scope projects for the current user/context
+  let projects = (state.projects || []).slice();
+  if (scope === 'technical_mahashakha') {
+    const allowed = MAHASHAKHA_STRUCTURE[MAHASHAKHA.TECHNICAL] || [];
+    projects = projects.filter(p => {
+      const s = (p.shakha || '').toString();
+      if (!s) return false;
+      if (allowed.includes(s)) return true;
+      if (s.includes('प्राविधिक')) return true;
+      return false;
+    });
+  } else if (state.currentUser && state.currentUser.role !== 'admin' && state.currentUser.role !== 'technical_head') {
+    // Shakha user scope (keep existing behavior)
+    projects = projects.filter(p => p.shakha === SHAKHA[state.currentUser.shakha] || p.shakha === state.currentUser.shakha);
+  }
+
+  const active = projects.filter(p => p.status === 'active').length;
+  const completed = projects.filter(p => (p.improvementInfo && String(p.improvementInfo).trim() !== '')).length;
+  const pending = projects.filter(p => (!p.improvementInfo || String(p.improvementInfo).trim() === '')).length;
+
+  const recentRows = projects.slice(0, 8).map((p, i) => {
+    const date = p.inspectionDate || '-';
+    const org = p.organization || '-';
+    const name = p.name || '-';
+    const statusLabel = (p.improvementInfo && String(p.improvementInfo).trim() !== '') ? 'सम्पन्न' : (p.status === 'active' ? 'चालु' : 'काम बाँकी');
+    const badgeClass = (statusLabel === 'सम्पन्न') ? 'status-resolved' : (statusLabel === 'चालु') ? 'status-progress' : 'status-pending';
+    return `<tr><td>${i + 1}</td><td class="text-limit">${name}</td><td class="text-limit">${org}</td><td>${date}</td><td><span class="status-badge ${badgeClass}">${statusLabel}</span></td></tr>`;
+  }).join('');
+
+  const content = `
+    <div class="tech-overview">
+      <div class="tech-overview-header">
+        <div class="d-flex align-center justify-between gap-2 flex-wrap">
+          <div>
+            <div class="text-small text-muted">समग्र अवस्था</div>
+            <div class="text-large">प्राविधिक परीक्षण/आयोजना अनुगमन</div>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline btn-sm" onclick="showDashboardView()"><i class="fas fa-arrow-left"></i> ड्यासबोर्ड</button>
+            <button class="btn btn-primary btn-sm" onclick="showTechnicalProjectsView()"><i class="fas fa-list"></i> सूची हेर्नुहोस्</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tech-overview-grid">
+        <div class="card">
+          <div class="card-header d-flex justify-between align-center">
+            <h6 class="mb-0">चार्ट (क्लिक गर्दा फिल्टर)</h6>
+            ${getChartActionsHTML('projectStatusChart')}
+          </div>
+          <div class="card-body">
+            <div class="chart-wrapper dashboard-chart-wrapper tech-overview-chart">
+              <canvas id="projectStatusChart"></canvas>
+            </div>
+            <div class="tech-kpi-grid mt-2">
+              <div class="tech-kpi">
+                <div class="tech-kpi-label">कूल</div>
+                <div class="tech-kpi-value">${projects.length}</div>
+              </div>
+              <div class="tech-kpi">
+                <div class="tech-kpi-label">चालु</div>
+                <div class="tech-kpi-value">${active}</div>
+              </div>
+              <div class="tech-kpi">
+                <div class="tech-kpi-label">सम्पन्न</div>
+                <div class="tech-kpi-value">${completed}</div>
+              </div>
+              <div class="tech-kpi">
+                <div class="tech-kpi-label">काम बाँकी</div>
+                <div class="tech-kpi-value">${pending}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header d-flex justify-between align-center">
+            <h6 class="mb-0">हालैका दर्ताहरू</h6>
+            <a href="#" class="text-primary text-small" onclick="showTechnicalProjectsView()">सबै हेर्नुहोस्</a>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-compact mb-0">
+                <thead><tr><th>क्र.सं.</th><th>आयोजनाको नाम</th><th>निकाय</th><th>मिति</th><th>स्थिति</th></tr></thead>
+                <tbody>${recentRows || `<tr><td colspan="5" class="text-center text-muted">डाटा उपलब्ध छैन</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const contentArea = document.getElementById('contentArea');
+  if (contentArea) contentArea.innerHTML = content;
+  applyDevanagariDigits(contentArea);
+  updateActiveNavItem();
+
+  // Provide scoped data to chart builder
+  state._technicalOverviewProjects = projects;
+  setTimeout(() => {
+    initializeDashboardCharts();
+  }, 300);
+}
+
+function showTechnicalProjectsView(options = {}) {
   state.currentView = 'technical_projects';
   document.getElementById('pageTitle').textContent = 'प्राविधिक परीक्षण';
+
+  // Avoid leaking overview-scoped data to other views
+  try { delete state._technicalOverviewProjects; } catch (e) { state._technicalOverviewProjects = null; }
   
   let technicalProjects = state.projects;
   if (state.currentUser && state.currentUser.role !== 'admin') {
-    technicalProjects = technicalProjects.filter(p => p.shakha === SHAKHA[state.currentUser.shakha] || p.shakha === state.currentUser.shakha);
+    if (state.currentUser.role === 'mahashakha' && ((state.currentUser.mahashakha || state.currentUser.name || '').toString() === MAHASHAKHA.TECHNICAL)) {
+      const allowed = MAHASHAKHA_STRUCTURE[MAHASHAKHA.TECHNICAL] || [];
+      technicalProjects = (technicalProjects || []).filter(p => {
+        const s = (p.shakha || '').toString();
+        if (!s) return false;
+        if (allowed.includes(s)) return true;
+        if (s.includes('प्राविधिक')) return true;
+        return false;
+      });
+    } else if (state.currentUser.role !== 'technical_head') {
+      technicalProjects = (technicalProjects || []).filter(p => p.shakha === SHAKHA[state.currentUser.shakha] || p.shakha === state.currentUser.shakha);
+    }
+  }
+  
+  // Handle monthly filtering
+  if (options.monthly) {
+    const currentMonth = getCurrentNepaliDate().substring(0, 7); // Get YYYY-MM format
+    technicalProjects = technicalProjects.filter(p => p.inspectionDate && p.inspectionDate.startsWith(currentMonth));
+  }
+  
+  // Handle status filtering
+  if (options.status) {
+    // New filtering logic based on improvement info received date
+    if (options.status === 'completed') {
+      // Show only projects with improvement info received date
+      technicalProjects = technicalProjects.filter(p => p.improvementInfo && p.improvementInfo.trim() !== '');
+    } else if (options.status === 'pending') {
+      // Show only projects without improvement info received date
+      technicalProjects = technicalProjects.filter(p => !p.improvementInfo || p.improvementInfo.trim() === '');
+    } else {
+      // For 'active' status, show all (existing behavior)
+      technicalProjects = technicalProjects.filter(p => p.status === options.status);
+    }
   }
   
   const content = `
@@ -7524,6 +9096,395 @@ function saveCitizenCharterEdit(id) {
   showCitizenCharterView();
 }
 
+function showInvestigationView() {
+  state.currentView = 'investigation';
+  document.getElementById('pageTitle').textContent = 'छानविन/अन्वेषण';
+  
+  const content = `
+    <div class="card">
+      <div class="card-header d-flex justify-between align-center">
+        <h5 class="mb-0">छानविन/अन्वेषण अभिलेख</h5>
+        <button class="btn btn-primary btn-sm" onclick="showNewInvestigation()"><i class="fas fa-plus"></i> नयाँ छानविन/अन्वेषण</button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table">
+            <thead><tr><th>क्र.सं.</th><th>उजुरी दर्ता नं</th><th>दर्ता मिति</th><th>उजुरकर्ता</th><th>विपक्षी</th><th>कार्यालय/निकाय</th><th>उजुरीको विवरण</th><th>छानविन प्रतिवेदन मिति</th><th>कार्य</th></tr></thead>
+            <tbody>
+              ${state.investigations.map((record, index) => `
+                <tr>
+                  <td data-label="क्र.सं.">${index + 1}</td>
+                  <td data-label="उजुरी दर्ता नं">${record.complaintRegNo}</td>
+                  <td data-label="दर्ता मिति">${record.registrationDate}</td>
+                  <td data-label="उजुरकर्ता">${record.complainant}</td>
+                  <td data-label="विपक्षी">${record.accused}</td>
+                  <td data-label="कार्यालय/निकाय">${record.office}</td>
+                  <td data-label="उजुरीको विवरण">${record.complaintDescription}</td>
+                  <td data-label="छानविन प्रतिवेदन मिति">${record.reportSubmissionDate}</td>
+                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="viewInvestigation" data-id="${record.id}" title="हेर्नुहोस्"><i class="fas fa-eye"></i></button><button class="action-btn" data-action="editInvestigation" data-id="${record.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button></div></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ${state.investigations.length === 0 ? '<div class="text-center p-4 text-muted">कुनै छानविन/अन्वेषण अभिलेख छैन।</div>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('contentArea').innerHTML = content;
+  applyDevanagariDigits(document.getElementById('contentArea'));
+}
+
+function showNewInvestigation() {
+  const formContent = `
+    <form id="investigationForm" onsubmit="event.preventDefault(); saveInvestigation();">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">उजुरी दर्ता नं <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="complaintRegNo" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">दर्ता मिति <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="registrationDate" required>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">उजुरकर्ता <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="complainant" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">विपक्षी <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="accused" required>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">कार्यालय/निकाय <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="office" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">सम्बन्धित मन्त्रालय/निकाय</label>
+          <select class="form-select" id="ministry">
+            <option value="">छनौट गर्नुहोस्</option>
+            ${MINISTRIES.map(min => `<option value="${min}">${min}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">प्रदेश</label>
+          <select class="form-select" id="province" onchange="loadInvestigationDistricts()">
+            <option value="">प्रदेश छन्नुहोस्</option>
+            ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) => 
+              `<option value="${key}">${value}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">जिल्ला</label>
+          <select class="form-select" id="district" disabled onchange="loadInvestigationLocals()">
+            <option value="">जिल्ला छन्नुहोस्</option>
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">स्थानीय तह/नगर</label>
+          <select class="form-select" id="localLevel" disabled>
+            <option value="">पहिला जिल्ला छान्नुहोस्</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">उजुरीको विवरण <span class="text-danger">*</span></label>
+        <textarea class="form-control" id="complaintDescription" rows="3" maxlength="500" required></textarea>
+        <small class="text-muted">अधिकतम ५०० अक्षर</small>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">छानविन/अन्वेषण प्रतिवेदन पेश भएको मिति</label>
+          <input type="text" class="form-control" id="reportSubmissionDate">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">छानविन/अन्वेषणको राय</label>
+          <textarea class="form-control" id="investigationOpinion" rows="3" maxlength="500"></textarea>
+          <small class="text-muted">अधिकतम ५०० अक्षर</small>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">कार्यान्वयनका लागि लेखि पठाएको व्यहोरा</label>
+        <textarea class="form-control" id="implementationDetails" rows="3" maxlength="500"></textarea>
+        <small class="text-muted">अधिकतम ५०० अक्षर</small>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">कार्यान्वयनका लागि लेखि पठाएको मिति</label>
+          <input type="text" class="form-control" id="implementationDate">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">कैफियत</label>
+          <textarea class="form-control" id="remarks" rows="3" maxlength="500"></textarea>
+          <small class="text-muted">अधिकतम ५०० अक्षर</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button>
+        <button type="submit" class="btn btn-primary">सुरक्षित गर्नुहोस्</button>
+      </div>
+    </form>
+  `;
+  
+  openModal('नयाँ छानविन/अन्वेषण', formContent);
+  setTimeout(() => { 
+    initializeDatepickers(); 
+    initializeNepaliDropdowns(); 
+  }, 100);
+}
+
+function saveInvestigation() {
+  showLoadingIndicator(true);
+  
+  const formData = {
+    id: Date.now().toString(),
+    complaintRegNo: getValue('complaintRegNo', 'उजुरी दर्ता नं'),
+    registrationDate: getValue('registrationDate', 'दर्ता मिति'),
+    complainant: getValue('complainant', 'उजुरकर्ता'),
+    accused: getValue('accused', 'विपक्षी'),
+    office: getValue('office', 'कार्यालय/निकाय'),
+    ministry: getValue('ministry', 'सम्बन्धित मन्त्रालय/निकाय'),
+    province: getValue('province', 'प्रदेश'),
+    district: getValue('district', 'जिल्ला'),
+    localLevel: getValue('localLevel', 'स्थानीय तह/नगर'),
+    complaintDescription: getValue('complaintDescription', 'उजुरीको विवरण'),
+    reportSubmissionDate: getValue('reportSubmissionDate', 'छानविन/अन्वेषण प्रतिवेदन पेश भएको मिति'),
+    investigationOpinion: getValue('investigationOpinion', 'छानविन/अन्वेषणको राय'),
+    implementationDetails: getValue('implementationDetails', 'कार्यान्वयनका लागि लेखि पठाएको व्यहोरा'),
+    implementationDate: getValue('implementationDate', 'कार्यान्वयनका लागि लेखि पठाएको मिति'),
+    remarks: getValue('remarks', 'कैफियत'),
+    createdBy: state.currentUser?.name || 'Unknown',
+    createdAt: new Date().toISOString()
+  };
+  
+  const newRecord = { ...formData };
+  
+  googleSheetOperation('createInvestigation', newRecord)
+    .then(result => {
+      state.investigations.unshift(newRecord);
+      showLoadingIndicator(false);
+      showToast(result.success ? 'छानविन/अन्वेषण Google Sheet मा सुरक्षित गरियो' : 'छानविन/अन्वेषण Local मा सुरक्षित गरियो', result.success ? 'success' : 'warning');
+      closeModal();
+      showInvestigationView();
+    })
+    .catch(error => {
+      console.error('Error saving investigation:', error);
+      showLoadingIndicator(false);
+      showToast('छानविन/अन्वेषण सुरक्षित गर्नमा समस्या भयो', 'error');
+    });
+}
+
+function viewInvestigation(id) {
+  const record = state.investigations.find(r => r.id === id);
+  if (!record) return;
+  
+  const content = `
+    <div class="row">
+      <div class="col-md-6"><strong>उजुरी दर्ता नं:</strong></div>
+      <div class="col-md-6">${record.complaintRegNo}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>दर्ता मिति:</strong></div>
+      <div class="col-md-6">${record.registrationDate}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>उजुरकर्ता:</strong></div>
+      <div class="col-md-6">${record.complainant}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>विपक्षी:</strong></div>
+      <div class="col-md-6">${record.accused}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>कार्यालय/निकाय:</strong></div>
+      <div class="col-md-6">${record.office}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>उजुरीको विवरण:</strong></div>
+      <div class="col-md-6">${record.complaintDescription}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>छानविन प्रतिवेदन मिति:</strong></div>
+      <div class="col-md-6">${record.reportSubmissionDate}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>छानविनको राय:</strong></div>
+      <div class="col-md-6">${record.investigationOpinion}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>कार्यान्वयन विवरण:</strong></div>
+      <div class="col-md-6">${record.implementationDetails}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>कार्यान्वयन मिति:</strong></div>
+      <div class="col-md-6">${record.implementationDate}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-6"><strong>कैफियत:</strong></div>
+      <div class="col-md-6">${record.remarks}</div>
+    </div>
+  `;
+  
+  openModal('छानविन/अन्वेषण विवरण', content);
+}
+
+function editInvestigation(id) {
+  const record = state.investigations.find(r => r.id === id);
+  if (!record) return;
+  
+  const formContent = `
+    <form id="investigationEditForm" onsubmit="event.preventDefault(); saveInvestigationEdit(${id});">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">उजुरी दर्ता नं <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="complaintRegNo" value="${record.complaintRegNo}" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">दर्ता मिति <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="registrationDate" value="${record.registrationDate}" required>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">उजुरकर्ता <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="complainant" value="${record.complainant}" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">विपक्षी <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="accused" value="${record.accused}" required>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">कार्यालय/निकाय <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="office" value="${record.office}" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">सम्बन्धित मन्त्रालय/निकाय</label>
+          <select class="form-select" id="ministry">
+            <option value="">छनौट गर्नुहोस्</option>
+            ${MINISTRIES.map(min => `<option value="${min}" ${record.ministry === min ? 'selected' : ''}>${min}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">प्रदेश</label>
+          <select class="form-select" id="province" onchange="loadInvestigationDistricts()">
+            <option value="">प्रदेश छन्नुहोस्</option>
+            ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) => 
+              `<option value="${key}" ${record.province === key ? 'selected' : ''}>${value}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">जिल्ला</label>
+          <select class="form-select" id="district" ${!record.province ? 'disabled' : ''} onchange="loadInvestigationLocals()">
+            <option value="">जिल्ला छन्नुहोस्</option>
+            ${record.province && LOCATION_FIELDS.DISTRICTS[record.province] ? 
+              LOCATION_FIELDS.DISTRICTS[record.province].map(dist => 
+                `<option value="${dist}" ${record.district === dist ? 'selected' : ''}>${dist}</option>`
+              ).join('') : ''
+            }
+          </select>
+        </div>
+        <div class="col-md-4 mb-3">
+          <label class="form-label">स्थानीय तह/नगर</label>
+          <select class="form-select" id="localLevel" data-selected="${record.localLevel || ''}">
+            <option value="">पहिला जिल्ला छान्नुहोस्</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">उजुरीको विवरण <span class="text-danger">*</span></label>
+        <textarea class="form-control" id="complaintDescription" rows="3" maxlength="500" required>${record.complaintDescription}</textarea>
+        <small class="text-muted">अधिकतम ५०० अक्षर</small>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">छानविन/अन्वेषण प्रतिवेदन पेश भएको मिति</label>
+          <input type="text" class="form-control" id="reportSubmissionDate" value="${record.reportSubmissionDate}">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">छानविन/अन्वेषणको राय</label>
+          <textarea class="form-control" id="investigationOpinion" rows="3" maxlength="500">${record.investigationOpinion}</textarea>
+          <small class="text-muted">अधिकतम ५०० अक्षर</small>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">कार्यान्वयनका लागि लेखि पठाएको व्यहोरा</label>
+        <textarea class="form-control" id="implementationDetails" rows="3" maxlength="500">${record.implementationDetails}</textarea>
+        <small class="text-muted">अधिकतम ५०० अक्षर</small>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">कार्यान्वयनका लागि लेखि पठाएको मिति</label>
+          <input type="text" class="form-control" id="implementationDate" value="${record.implementationDate}">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">कैफियत</label>
+          <textarea class="form-control" id="remarks" rows="3" maxlength="500">${record.remarks}</textarea>
+          <small class="text-muted">अधिकतम ५०० अक्षर</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button>
+        <button type="submit" class="btn btn-primary">सुरक्षित गर्नुहोस्</button>
+      </div>
+    </form>
+  `;
+  
+  openModal('छानविन/अन्वेषण सम्पादन', formContent);
+  setTimeout(() => { 
+    initializeDatepickers(); 
+    initializeNepaliDropdowns(); 
+    try { loadInvestigationDistricts(); } catch(e){}
+  }, 100);
+}
+
+function saveInvestigationEdit(id) {
+  showLoadingIndicator(true);
+  
+  const updatedRecord = {
+    id: id,
+    complaintRegNo: getValue('complaintRegNo', 'उजुरी दर्ता नं'),
+    registrationDate: getValue('registrationDate', 'दर्ता मिति'),
+    complainant: getValue('complainant', 'उजुरकर्ता'),
+    accused: getValue('accused', 'विपक्षी'),
+    office: getValue('office', 'कार्यालय/निकाय'),
+    ministry: getValue('ministry', 'सम्बन्धित मन्त्रालय/निकाय'),
+    province: getValue('province', 'प्रदेश'),
+    district: getValue('district', 'जिल्ला'),
+    localLevel: getValue('localLevel', 'स्थानीय तह/नगर'),
+    complaintDescription: getValue('complaintDescription', 'उजुरीको विवरण'),
+    reportSubmissionDate: getValue('reportSubmissionDate', 'छानविन/अन्वेषण प्रतिवेदन पेश भएको मिति'),
+    investigationOpinion: getValue('investigationOpinion', 'छानविन/अन्वेषणको राय'),
+    implementationDetails: getValue('implementationDetails', 'कार्यान्वयनका लागि लेखि पठाएको व्यहोरा'),
+    implementationDate: getValue('implementationDate', 'कार्यान्वयनका लागि लेखि पठाएको मिति'),
+    remarks: getValue('remarks', 'कैफियत'),
+    updatedBy: state.currentUser?.name || 'Unknown',
+    updatedAt: new Date().toISOString()
+  };
+  
+  const recordIndex = state.investigations.findIndex(r => r.id === id);
+  if (recordIndex !== -1) {
+    state.investigations[recordIndex] = updatedRecord;
+    showToast('छानविन/अन्वेषण सुरक्षित गरियो', 'success');
+    closeModal();
+    showInvestigationView();
+  }
+  
+  showLoadingIndicator(false);
+}
+
 function showReportsView() {
   state.currentView = 'reports';
   document.getElementById('pageTitle').textContent = 'रिपोर्टहरू';
@@ -7785,9 +9746,33 @@ function showSystemReportsView() {
   }, 100);
 }
 
-function showUserManagementView() {
+async function showUserManagementView() {
   state.currentView = 'user_management';
   document.getElementById('pageTitle').textContent = 'प्रयोगकर्ता व्यवस्थापन';
+
+  if (!state.currentUser || state.currentUser.role !== 'admin') {
+    showToast('यो सुविधा एडमिनका लागि मात्र हो', 'warning');
+    return;
+  }
+
+  showLoadingIndicator(true);
+  await loadUsersFromSheetsForAdmin();
+  showLoadingIndicator(false);
+
+  const roleLabel = (r) => {
+    const v = (r || '').toString();
+    if (v === 'admin') return 'एडमिन';
+    if (v === 'admin_planning') return 'प्रशासन/योजना';
+    if (v === 'mahashakha') return 'महाशाखा';
+    return 'शाखा';
+  };
+
+  const statusLabel = (s) => {
+    const v = (s || '').toString().toLowerCase();
+    if (v === 'active' || v === 'सक्रिय') return 'सक्रिय';
+    if (v === 'inactive' || v === 'निष्क्रिय') return 'निष्क्रिय';
+    return s || '-';
+  };
   
   const content = `
     <div class="card">
@@ -7800,12 +9785,19 @@ function showUserManagementView() {
           <table class="table">
             <thead><tr><th>क्र.सं.</th><th>युजरनेम</th><th>नाम</th><th>भूमिका</th><th>स्थिति</th><th>अन्तिम लगइन</th><th>कार्य</th></tr></thead>
             <tbody>
-              ${state.users.map((user, index) => `
+              ${(state.users || []).map((user, index) => `
                 <tr>
-                  <td data-label="क्र.सं.">${index + 1}</td><td data-label="युजरनेम">${user.username}</td><td data-label="नाम">${user.name}</td><td data-label="भूमिका">${user.role}</td>
-                  <td data-label="स्थिति"><span class="status-badge ${user.status === 'सक्रिय' ? 'status-resolved' : 'status-pending'}">${user.status}</span></td>
+                  <td data-label="क्र.सं.">${index + 1}</td><td data-label="युजरनेम">${user.username || '-'}</td><td data-label="नाम">${user.name || '-'}</td><td data-label="भूमिका">${roleLabel(user.role)}</td>
+                  <td data-label="स्थिति"><span class="status-badge ${statusLabel(user.status) === 'सक्रिय' ? 'status-resolved' : 'status-pending'}">${statusLabel(user.status)}</span></td>
                   <td data-label="अन्तिम लगइन">${user.lastLogin}</td>
-                  <td data-label="कार्य"><div class="table-actions"><button class="action-btn" data-action="editUser" data-id="${user.id}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button><button class="action-btn" data-action="resetUserPassword" data-id="${user.id}" title="पासवर्ड रिसेट"><i class="fas fa-key"></i></button><button class="action-btn" data-action="toggleUserStatus" data-id="${user.id}" title="निष्क्रिय गर्नुहोस्"><i class="fas fa-ban"></i></button></div></td>
+                  <td data-label="कार्य">
+                    <div class="table-actions">
+                      <button class="action-btn" data-action="editUser" data-id="${user.username}" title="सम्पादन गर्नुहोस्"><i class="fas fa-edit"></i></button>
+                      <button class="action-btn" data-action="resetUserPassword" data-id="${user.username}" title="पासवर्ड रिसेट"><i class="fas fa-key"></i></button>
+                      <button class="action-btn" data-action="toggleUserStatus" data-id="${user.username}" title="स्थिति परिवर्तन"><i class="fas fa-ban"></i></button>
+                      <button class="action-btn" data-action="deleteUserAccount" data-id="${user.username}" title="हटाउनुहोस्"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -7814,8 +9806,8 @@ function showUserManagementView() {
       </div>
     </div>
   `;
-  
-  document.getElementById('contentArea').innerHTML = content;
+
+  setContentAreaHTML(content);
   updateActiveNavItem();
 }
 
@@ -7838,9 +9830,11 @@ function showNewUserModal() {
       </div>
       <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
         <div class="form-group"><label class="form-label">नाम *</label><input type="text" class="form-control" id="newName" placeholder="पूरा नाम" /></div>
-        <div class="form-group"><label class="form-label">भूमिका *</label><select class="form-select" id="newRole"><option value="">छान्नुहोस्</option><option value="admin">एडमिन</option><option value="shakha">शाखा</option></select></div>
+        <div class="form-group"><label class="form-label">भूमिका *</label><select class="form-select" id="newRole"><option value="">छान्नुहोस्</option><option value="admin">एडमिन</option><option value="admin_planning">प्रशासन/योजना</option><option value="mahashakha">महाशाखा</option><option value="shakha">शाखा</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">शाखा (यदि शाखा हो भने)</label><select class="form-select" id="newShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => `<option value="${key}">${value}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">महाशाखा (यदि महाशाखा हो भने)</label><select class="form-select" id="newMahashakha"><option value="">छान्नुहोस्</option>${Object.entries(MAHASHAKHA).filter(([k,v]) => typeof v === 'string').map(([key, value]) => `<option value="${value}">${value}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">अनुमतिहरू (comma separated)</label><input type="text" class="form-control" id="newPermissions" placeholder="complaint_management,technical_inspection" /></div>
       <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="newStatus"><option value="सक्रिय">सक्रिय</option><option value="निष्क्रिय">निष्क्रिय</option></select></div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveNewUser()">सुरक्षित गर्नुहोस्</button></div>
@@ -7849,12 +9843,14 @@ function showNewUserModal() {
   openModal('नयाँ प्रयोगकर्ता', formContent);
 }
 
-function saveNewUser() {
+async function saveNewUser() {
   const username = document.getElementById('newUsername').value;
   const password = document.getElementById('newPassword').value;
   const name = document.getElementById('newName').value;
   const role = document.getElementById('newRole').value;
   const shakha = document.getElementById('newShakha').value;
+  const mahashakha = document.getElementById('newMahashakha')?.value || '';
+  const permissionsRaw = document.getElementById('newPermissions')?.value || '';
   const status = document.getElementById('newStatus').value;
   
   if (!username || !password || !name || !role) {
@@ -7862,28 +9858,74 @@ function saveNewUser() {
     return;
   }
   
-  if (role === 'shakha' && !shakha) {
+  if ((role === 'shakha' || role === 'admin_planning') && !shakha) {
     showToast('कृपया शाखा छान्नुहोस्', 'warning');
     return;
   }
-  
-  const newUser = {
-    id: Date.now(), username, password, name,
-    role: role === 'admin' ? 'एडमिन' : 'शाखा',
-    shakha: role === 'shakha' ? shakha : null,
-    status, lastLogin: '-',
-    createdBy: state.currentUser.name,
-    createdAt: new Date().toISOString()
+
+  if (role === 'mahashakha' && !mahashakha) {
+    showToast('कृपया महाशाखा छान्नुहोस्', 'warning');
+    return;
+  }
+
+  const permissions = String(permissionsRaw).split(',').map(s => s.trim()).filter(Boolean);
+
+  const payload = {
+    username,
+    password,
+    name,
+    role,
+    shakha: (role === 'shakha' || role === 'admin_planning') ? shakha : '',
+    mahashakha: role === 'mahashakha' ? mahashakha : '',
+    permissions: permissions.join(','),
+    status: status === 'सक्रिय' ? 'active' : 'inactive',
+    last_login: ''
   };
-  
-  state.users.push(newUser);
-  showToast('नयाँ प्रयोगकर्ता सुरक्षित गरियो', 'success');
-  closeModal();
-  showUserManagementView();
+
+  try {
+    showLoadingIndicator(true);
+    if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+      const res = await postToGoogleSheets('saveUser', payload);
+      console.log('saveUser response:', res);
+      if (!res || res.success !== true) {
+        showToast(res && res.message ? res.message : 'प्रयोगकर्ता सेभ हुन सकेन', 'error');
+        return;
+      }
+
+      await loadUsersFromSheetsForAdmin();
+      const found = (state.users || []).some(u => String(u.username) === String(username));
+      if (!found) {
+        showToast('Google Sheet मा प्रयोगकर्ता अपडेट देखिएन। कृपया Apps Script redeploy/permissions जाँच्नुहोस्।', 'warning');
+        return;
+      }
+    } else {
+      // local fallback
+      if (!state.users) state.users = [];
+      state.users.push({
+        username,
+        name,
+        role,
+        shakha: payload.shakha,
+        mahashakha: payload.mahashakha,
+        permissions,
+        status: payload.status,
+        lastLogin: '-'
+      });
+    }
+
+    showToast('नयाँ प्रयोगकर्ता सुरक्षित गरियो', 'success');
+    closeModal();
+    await showUserManagementView();
+  } catch (e) {
+    console.error('saveNewUser error', e);
+    showToast('प्रयोगकर्ता सेभ गर्दा समस्या आयो', 'error');
+  } finally {
+    showLoadingIndicator(false);
+  }
 }
 
 function editUser(id) {
-  const user = state.users.find(u => u.id === id);
+  const user = (state.users || []).find(u => String(u.username) === String(id));
   if (!user) return;
   
   const formContent = `
@@ -7894,73 +9936,168 @@ function editUser(id) {
       </div>
       <div class="d-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
         <div class="form-group"><label class="form-label">नाम</label><input type="text" class="form-control" value="${user.name}" id="editName" /></div>
-        <div class="form-group"><label class="form-label">भूमिका</label><select class="form-select" id="editRole"><option value="admin" ${user.role === 'एडमिन' ? 'selected' : ''}>एडमिन</option><option value="shakha" ${user.role === 'शाखा' ? 'selected' : ''}>शाखा</option></select></div>
+        <div class="form-group"><label class="form-label">भूमिका</label><select class="form-select" id="editRole"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>एडमिन</option><option value="admin_planning" ${user.role === 'admin_planning' ? 'selected' : ''}>प्रशासन/योजना</option><option value="mahashakha" ${user.role === 'mahashakha' ? 'selected' : ''}>महाशाखा</option><option value="shakha" ${user.role === 'shakha' ? 'selected' : ''}>शाखा</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">शाखा (यदि शाखा हो भने)</label><select class="form-select" id="editShakha"><option value="">छान्नुहोस्</option>${Object.entries(SHAKHA).map(([key, value]) => `<option value="${key}" ${user.shakha === key ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
-      <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="editStatus"><option value="सक्रिय" ${user.status === 'सक्रिय' ? 'selected' : ''}>सक्रिय</option><option value="निष्क्रिय" ${user.status === 'निष्क्रिय' ? 'selected' : ''}>निष्क्रिय</option></select></div>
+      <div class="form-group"><label class="form-label">महाशाखा (यदि महाशाखा हो भने)</label><select class="form-select" id="editMahashakha"><option value="">छान्नुहोस्</option>${Object.entries(MAHASHAKHA).filter(([k,v]) => typeof v === 'string').map(([key, value]) => `<option value="${value}" ${String(user.mahashakha||'') === String(value) ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">अनुमतिहरू (comma separated)</label><input type="text" class="form-control" id="editPermissions" value="${(user.permissions || []).join(',')}" /></div>
+      <div class="form-group"><label class="form-label">स्थिति</label><select class="form-select" id="editStatus"><option value="सक्रिय" ${(String(user.status).toLowerCase()==='active' || user.status === 'सक्रिय') ? 'selected' : ''}>सक्रिय</option><option value="निष्क्रिय" ${(String(user.status).toLowerCase()==='inactive' || user.status === 'निष्क्रिय') ? 'selected' : ''}>निष्क्रिय</option></select></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveUserEdit(${id})">सुरक्षित गर्नुहोस्</button></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">रद्द गर्नुहोस्</button><button class="btn btn-primary" onclick="saveUserEdit('${user.username}')">सुरक्षित गर्नुहोस्</button></div>
   `;
   
   openModal('प्रयोगकर्ता सम्पादन', formContent);
 }
 
-function saveUserEdit(id) {
-  const userIndex = state.users.findIndex(u => u.id === id);
+async function saveUserEdit(id) {
+  const userIndex = (state.users || []).findIndex(u => String(u.username) === String(id));
   if (userIndex === -1) return;
-  
+
   const name = document.getElementById('editName').value;
   const password = document.getElementById('editPassword').value;
   const role = document.getElementById('editRole').value;
   const shakha = document.getElementById('editShakha').value;
+  const mahashakha = document.getElementById('editMahashakha')?.value || '';
+  const permissionsRaw = document.getElementById('editPermissions')?.value || '';
   const status = document.getElementById('editStatus').value;
-  
+
   if (!name) {
     showToast('कृपया नाम भर्नुहोस्', 'warning');
     return;
   }
   
-  if (role === 'shakha' && !shakha) {
+  if ((role === 'shakha' || role === 'admin_planning') && !shakha) {
     showToast('कृपया शाखा छान्नुहोस्', 'warning');
     return;
   }
-  
-  const updatedUser = {
-    ...state.users[userIndex],
-    name, role: role === 'admin' ? 'एडमिन' : 'शाखा',
-    shakha: role === 'shakha' ? shakha : null, status
-  };
-  
-  if (password) updatedUser.password = password;
-  
-  state.users[userIndex] = updatedUser;
-  showToast('प्रयोगकर्ता सुरक्षित गरियो', 'success');
-  closeModal();
-  showUserManagementView();
-}
 
-function resetUserPassword(id) {
-  if (confirm('के तपाईं यस प्रयोगकर्ताको पासवर्ड रिसेट गर्न चाहनुहुन्छ?')) {
-    const userIndex = state.users.findIndex(u => u.id === id);
-    if (userIndex !== -1) {
-      state.users[userIndex].password = 'nvc@2024';
-      showToast('पासवर्ड रिसेट गरियो (नयाँ पासवर्ड: nvc@2024)', 'success');
-      showUserManagementView();
+  if (role === 'mahashakha' && !mahashakha) {
+    showToast('कृपया महाशाखा छान्नुहोस्', 'warning');
+    return;
+  }
+
+  const permissions = String(permissionsRaw).split(',').map(s => s.trim()).filter(Boolean);
+
+  const payload = {
+    username: String(id),
+    name,
+    role,
+    shakha: (role === 'shakha' || role === 'admin_planning') ? shakha : '',
+    mahashakha: role === 'mahashakha' ? mahashakha : '',
+    permissions: permissions.join(','),
+    status: status === 'सक्रिय' ? 'active' : 'inactive'
+  };
+  if (password) payload.password = password;
+
+  try {
+    showLoadingIndicator(true);
+    if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+      const res = await postToGoogleSheets('saveUser', payload);
+      console.log('saveUser (edit) response:', res);
+      if (!res || res.success !== true) {
+        showToast(res && res.message ? res.message : 'प्रयोगकर्ता सेभ हुन सकेन', 'error');
+        return;
+      }
+
+      await loadUsersFromSheetsForAdmin();
+      const found = (state.users || []).some(u => String(u.username) === String(id));
+      if (!found) {
+        showToast('Google Sheet मा प्रयोगकर्ता अपडेट देखिएन। कृपया Apps Script redeploy/permissions जाँच्नुहोस्।', 'warning');
+        return;
+      }
+    } else {
+      state.users[userIndex] = { ...state.users[userIndex], ...payload, permissions, lastLogin: state.users[userIndex].lastLogin || '-' };
     }
+
+    showToast('प्रयोगकर्ता सुरक्षित गरियो', 'success');
+    closeModal();
+    await showUserManagementView();
+  } catch (e) {
+    console.error('saveUserEdit error', e);
+    showToast('प्रयोगकर्ता सेभ गर्दा समस्या आयो', 'error');
+  } finally {
+    showLoadingIndicator(false);
   }
 }
 
-function toggleUserStatus(id) {
-  const userIndex = state.users.findIndex(u => u.id === id);
+async function resetUserPassword(id) {
+  if (!confirm('के तपाईं यस प्रयोगकर्ताको पासवर्ड रिसेट गर्न चाहनुहुन्छ?')) return;
+  const userIndex = (state.users || []).findIndex(u => String(u.username) === String(id));
   if (userIndex === -1) return;
-  
-  const currentStatus = state.users[userIndex].status;
-  const newStatus = currentStatus === 'सक्रिय' ? 'निष्क्रिय' : 'सक्रिय';
-  
-  if (confirm(`के तपाईं यस प्रयोगकर्तालाई ${newStatus} गर्न चाहनुहुन्छ?`)) {
-    state.users[userIndex].status = newStatus;
-    showToast(`प्रयोगकर्ता ${newStatus} गरियो`, 'success');
-    showUserManagementView();
+
+  const newPass = 'nvc@2026';
+  try {
+    showLoadingIndicator(true);
+    if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+      const res = await postToGoogleSheets('saveUser', { username: String(id), password: newPass });
+      if (!res || res.success !== true) {
+        showToast(res && res.message ? res.message : 'पासवर्ड रिसेट हुन सकेन', 'error');
+        return;
+      }
+    } else {
+      state.users[userIndex].password = newPass;
+    }
+    showToast('पासवर्ड रिसेट गरियो (नयाँ पासवर्ड: nvc@2026)', 'success');
+    await showUserManagementView();
+  } catch (e) {
+    console.error('resetUserPassword error', e);
+    showToast('पासवर्ड रिसेट गर्दा समस्या आयो', 'error');
+  } finally {
+    showLoadingIndicator(false);
+  }
+}
+
+async function toggleUserStatus(id) {
+  const userIndex = (state.users || []).findIndex(u => String(u.username) === String(id));
+  if (userIndex === -1) return;
+
+  const currentStatus = (state.users[userIndex].status || '').toString().toLowerCase();
+  const newStatus = (currentStatus === 'active' || currentStatus === 'सक्रिय') ? 'inactive' : 'active';
+  const label = (newStatus === 'active') ? 'सक्रिय' : 'निष्क्रिय';
+
+  if (!confirm(`के तपाईं यस प्रयोगकर्तालाई ${label} गर्न चाहनुहुन्छ?`)) return;
+
+  try {
+    showLoadingIndicator(true);
+    if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+      const res = await postToGoogleSheets('saveUser', { username: String(id), status: newStatus });
+      if (!res || res.success !== true) {
+        showToast(res && res.message ? res.message : 'स्थिति परिवर्तन हुन सकेन', 'error');
+        return;
+      }
+    } else {
+      state.users[userIndex].status = newStatus;
+    }
+    showToast(`प्रयोगकर्ता ${label} गरियो`, 'success');
+    await showUserManagementView();
+  } catch (e) {
+    console.error('toggleUserStatus error', e);
+    showToast('स्थिति परिवर्तन गर्दा समस्या आयो', 'error');
+  } finally {
+    showLoadingIndicator(false);
+  }
+}
+
+async function deleteUserAccount(id) {
+  if (!confirm('के तपाईं यो प्रयोगकर्ता हटाउन चाहनुहुन्छ?')) return;
+  try {
+    showLoadingIndicator(true);
+    if (GOOGLE_SHEETS_CONFIG.ENABLED) {
+      const res = await postToGoogleSheets('deleteUser', { username: String(id) });
+      if (!res || res.success !== true) {
+        showToast(res && res.message ? res.message : 'प्रयोगकर्ता हटाउन सकेन', 'error');
+        return;
+      }
+    } else {
+      state.users = (state.users || []).filter(u => String(u.username) !== String(id));
+    }
+    showToast('प्रयोगकर्ता हटाइयो', 'success');
+    await showUserManagementView();
+  } catch (e) {
+    console.error('deleteUserAccount error', e);
+    showToast('प्रयोगकर्ता हटाउँदा समस्या आयो', 'error');
+  } finally {
+    showLoadingIndicator(false);
   }
 }
 
@@ -8121,7 +10258,7 @@ function showCalendarView() {
 function showCalendarPrev() { /* TODO: implement month navigation */ updateNepaliDate(); showCalendarView(); }
 function showCalendarNext() { /* TODO: implement month navigation */ updateNepaliDate(); showCalendarView(); }
 
-function viewComplaint(id) {
+function _viewComplaint(id) {
   console.log('👁️ viewComplaint() called with ID:', id, 'Type:', typeof id);
   
   if (!state.complaints || state.complaints.length === 0) {
@@ -8261,6 +10398,12 @@ function viewComplaint(id) {
   openModal('उजुरी विवरण', content);
 }
 
+NVC.UI.viewComplaint = _viewComplaint;
+
+function viewComplaint(id) {
+  return NVC.UI.viewComplaint.apply(this, arguments);
+}
+
 function openPushNotificationModal(complaintId) {
   const complaint = state.complaints.find(c => c.id === complaintId);
   const targetShakha = complaint ? (complaint.shakha || '') : '';
@@ -8355,6 +10498,30 @@ function editComplaint(id) {
       </div>
       <div class="form-group"><label class="form-label">उजुरकर्ताको नाम</label><input type="text" class="form-control" value="${complaint.complainant}" id="editComplainant" /></div>
       <div class="form-group"><label class="form-label">विपक्षी</label><input type="text" class="form-control" value="${complaint.accused || ''}" id="editAccused" /></div>
+      <div class="form-group"><label class="form-label">मन्त्रालय/निकाय</label>
+        <select class="form-select" id="editMinistry">
+          <option value="">छनौट गर्नुहोस्</option>
+          ${MINISTRIES.map(min => `<option value="${min}" ${complaint.ministry === min ? 'selected' : ''}>${min}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">प्रदेश</label>
+        <select class="form-select" id="editProvince" onchange="loadEditDistricts()">
+          <option value="">प्रदेश छन्नुहोस्</option>
+          ${Object.entries(LOCATION_FIELDS.PROVINCE).map(([key, value]) => `<option value="${key}" ${(complaint.province === key || complaint.province === value) ? 'selected' : ''}>${value}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">जिल्ला</label>
+        <select class="form-select" id="editDistrict" ${!complaint.province ? 'disabled' : ''} onchange="loadEditLocals()">
+          <option value="">जिल्ला छन्नुहोस्</option>
+          ${(() => { const pk = Object.entries(LOCATION_FIELDS.PROVINCE).find(([k,v]) => complaint.province === k || complaint.province === v); return pk && LOCATION_FIELDS.DISTRICTS[pk[0]] ? LOCATION_FIELDS.DISTRICTS[pk[0]].map(dist => `<option value="${dist}" ${complaint.district === dist ? 'selected' : ''}>${dist}</option>`).join('') : ''; })()}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">स्थानीय तह</label>
+        <select class="form-select" id="editLocalLevel" data-selected="${complaint.localLevel || ''}">
+          <option value="">पहिला जिल्ला छान्नुहोस्</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">वडा</label><input type="text" class="form-control" value="${complaint.ward || ''}" id="editWard" /></div>
       <div class="form-group" style="grid-column: span 2;"><label class="form-label">उजुरीको विवरण</label><textarea class="form-control" rows="3" id="editDescription">${complaint.description}</textarea></div>
       
       <div class="form-group" style="grid-column: span 2;"><label class="form-label">समितिको निर्णय</label><textarea class="form-control" rows="2" id="editCommitteeDecision">${complaint.committeeDecision || complaint.proposedDecision || ''}</textarea></div>
@@ -8370,7 +10537,7 @@ function editComplaint(id) {
   `;
   
   openModal('उजुरी सम्पादन', formContent);
-  setTimeout(()=>{ initializeDatepickers(); initializeNepaliDropdowns(); }, 100);
+  setTimeout(()=>{ initializeDatepickers(); initializeNepaliDropdowns(); loadEditDistricts(); }, 100);
 }
 
 function saveComplaint(id) {
@@ -8398,7 +10565,7 @@ function saveComplaint(id) {
   showComplaintsView();
 }
 
-function deleteComplaint(id) {
+function _deleteComplaint(id) {
   if (confirm('के तपाईं यो उजुरी हटाउन चाहनुहुन्छ?')) {
     const index = state.complaints.findIndex(c => c.id === id);
     if (index !== -1) {
@@ -8410,11 +10577,18 @@ function deleteComplaint(id) {
   }
 }
 
+NVC.UI.deleteComplaint = _deleteComplaint;
+
+function deleteComplaint(id) {
+  return NVC.UI.deleteComplaint.apply(this, arguments);
+}
+
 function filterComplaintsTable() {
   // Use unified rendering via showComplaintsView to respect pagination and sorting.
   const status = document.getElementById('filterStatus')?.value || '';
   const finalDecisionType = document.getElementById('filterFinalDecisionType')?.value || '';
   const shakha = document.getElementById('filterShakha')?.value || '';
+  const ministry = document.getElementById('filterMinistry')?.value || '';
   const searchField = document.getElementById('searchField')?.value || 'all';
   const searchText = (document.getElementById('searchText')?.value || '').toLowerCase();
   const sortOrder = document.getElementById('sortOrder')?.value || 'newest';
@@ -8424,10 +10598,14 @@ function filterComplaintsTable() {
   if (!state.pagination) state.pagination = { itemsPerPage: 10, currentPage: 1, totalItems: 0 };
   state.pagination.currentPage = 1;
   
+  // Suppress content-area transition for this filter-triggered rerender
+  try { state._suppressContentTransition = true; } catch(e){}
+
   showComplaintsView({ 
       status, 
       finalDecisionType, 
       shakha, 
+      ministry,
       searchField, 
       search: searchText, 
       sortOrder, 
@@ -8435,6 +10613,20 @@ function filterComplaintsTable() {
       endDate,
       _fromFilter: true
   });
+  // Clear suppression shortly after render so other navigations still animate
+  setTimeout(() => { try { state._suppressContentTransition = false; } catch(e){} }, 250);
+
+  // After re-rendering the complaints view, restore caret/focus if it was previously in the search field
+  try {
+    setTimeout(() => {
+      const inEl = document.getElementById('searchText');
+      const sel = state._searchSelection;
+      if (inEl && sel && inEl.value === (sel.value || '')) {
+        try { inEl.focus({preventScroll:true}); } catch(e){ inEl.focus(); }
+        try { inEl.setSelectionRange(sel.start, sel.end); } catch(e){}
+      }
+    }, 0);
+  } catch(e) { /* swallow */ }
 }
 
 function saveComplaintsFilters() {
@@ -8442,6 +10634,7 @@ function saveComplaintsFilters() {
         status: document.getElementById('filterStatus')?.value || '',
         finalDecisionType: document.getElementById('filterFinalDecisionType')?.value || '',
         shakha: document.getElementById('filterShakha')?.value || '',
+      ministry: document.getElementById('filterMinistry')?.value || '',
         searchField: document.getElementById('searchField')?.value || 'all',
         search: document.getElementById('searchText')?.value || '',
         sortOrder: document.getElementById('sortOrder')?.value || 'newest',
@@ -8477,7 +10670,11 @@ function handleTableActions(e) {
     if (action === 'view') return viewComplaint(complaintId);
     if (action === 'edit') return editComplaint(complaintId);
     if (action === 'delete') return deleteComplaint(complaintId);
-    if (action === 'assign') return assignComplaint && assignComplaint(complaintId);
+    if (action === 'assign') return assignToShakha && assignToShakha(complaintId);
+    if (action === 'viewinvestigation') return viewInvestigation(complaintId);
+    if (action === 'editinvestigation') return editInvestigation(complaintId);
+    if (action === 'viewcitizencharter') return viewCitizenCharter(complaintId);
+    if (action === 'editcitizencharter') return editCitizenCharter(complaintId);
     return;
   }
 
@@ -8531,9 +10728,23 @@ function filterProjects() {
   const status = document.getElementById('filterProjectStatus').value;
   const searchText = document.getElementById('projectSearchText').value.toLowerCase();
   
-  let filtered = state.projects.filter(p => p.shakha === state.currentUser.shakha);
+  let filtered = state.projects;
+  if (state.currentUser && state.currentUser.role !== 'admin' && state.currentUser.role !== 'technical_head') {
+    filtered = filtered.filter(p => p.shakha === state.currentUser.shakha);
+  }
   
-  if (status) filtered = filtered.filter(p => p.status === status);
+  // New filtering logic based on improvement info received date
+  if (status === 'completed') {
+    // Show only projects with improvement info received date
+    filtered = filtered.filter(p => p.improvementInfo && p.improvementInfo.trim() !== '');
+  } else if (status === 'pending') {
+    // Show only projects without improvement info received date
+    filtered = filtered.filter(p => !p.improvementInfo || p.improvementInfo.trim() === '');
+  } else if (status) {
+    // For 'active' status, show all (existing behavior)
+    filtered = filtered.filter(p => p.status === status);
+  }
+  
   if (searchText) {
     filtered = filtered.filter(p => 
       p.name.toLowerCase().includes(searchText) ||
@@ -8585,6 +10796,7 @@ function updateActiveNavItem() {
         'new_complaint': 'नयाँ उजुरी',
         'technical_projects': 'प्राविधिक परीक्षण/आयोजना अनुगमन',
         'admin_complaints': 'हेलो सरकार उजुरीहरू',
+        'online_complaints': 'अनलाइन उजुरी',
         'employee_monitoring': 'कार्यालय अनुगमन',
         'citizen_charter': 'नागरिक बडापत्र अनुगमन',
         'calendar': 'क्यालेन्डर'
@@ -8856,6 +11068,35 @@ async function initializeApp() {
       }
     }
 
+    const savedInvestigations = localStorage.getItem('nvc_investigations_backup');
+    if (savedInvestigations) {
+      const parsed = JSON.parse(savedInvestigations);
+      if (Array.isArray(parsed)) {
+        state.investigations = parsed.map(r => {
+          if (!r) return null;
+          return {
+            ...r,
+            id: String(r.id || ''),
+            complaintRegNo: String(r.complaintRegNo || ''),
+            registrationDate: String(r.registrationDate || ''),
+            complainant: String(r.complainant || ''),
+            accused: String(r.accused || ''),
+            office: String(r.office || ''),
+            ministry: String(r.ministry || ''),
+            province: String(r.province || ''),
+            district: String(r.district || ''),
+            localLevel: String(r.localLevel || ''),
+            complaintDescription: String(r.complaintDescription || ''),
+            reportSubmissionDate: String(r.reportSubmissionDate || ''),
+            investigationOpinion: String(r.investigationOpinion || ''),
+            implementationDetails: String(r.implementationDetails || ''),
+            implementationDate: String(r.implementationDate || ''),
+            remarks: String(r.remarks || '')
+          };
+        }).filter(Boolean);
+      }
+    }
+
     const savedProjects = localStorage.getItem('nvc_projects_backup');
     if (savedProjects) {
       const parsed = JSON.parse(savedProjects);
@@ -8912,20 +11153,9 @@ async function initializeApp() {
   initializeDatepickers(); initializeNepaliDropdowns();
   loadTheme(); // Load saved theme
 
-  // Load from Google Sheets in the background without blocking UI
-  if (GOOGLE_SHEETS_CONFIG.ENABLED && GOOGLE_SHEETS_CONFIG.WEB_APP_URL && GOOGLE_SHEETS_CONFIG.WEB_APP_URL.includes('script.google.com')) {
-    console.log('📡 Starting background load from Google Sheets...');
-    loadDataFromGoogleSheets(true).then(loaded => {
-      if (loaded) {
-        console.log('✅ Background Google Sheets data loaded and UI updated.');
-      } else {
-        console.warn('⚠️ Background Google Sheets load failed. UI is using local data.');
-      }
-    });
-  } else {
-    console.log('ℹ️ Google Sheets not configured properly');
-    showLoadingIndicator(false);
-  }
+  // Performance: avoid full Google Sheets loads during initial app bootstrap.
+  // Full load will occur after login/dashboard navigation.
+  try { showLoadingIndicator(false); } catch (e) {}
   
   window._appInitialized = true;
   window._appInitializing = false;
@@ -8994,6 +11224,20 @@ try {
 } catch (e) {
   console.warn('Could not expose global handlers on window:', e);
 }
+
+// Prevent default navigation for anchor links that use href="#" or empty href
+// This avoids unwanted jumps/scroll when inline handlers are used without returning false
+document.addEventListener('click', function(e) {
+  try {
+    const a = e.target.closest && e.target.closest('a');
+    if (a) {
+      const href = a.getAttribute('href');
+      if (href === '#' || href === '' || href === null) {
+        e.preventDefault();
+      }
+    }
+  } catch (e) { /* ignore */ }
+});
 
 async function reinitializeApp() {
   console.log('🔄 Force reinitializing app...');
@@ -9338,5 +11582,218 @@ function loadDistricts() {
     if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
         LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => { const option = document.createElement('option'); option.value = dist; option.textContent = dist; districtSelect.appendChild(option); });
         districtSelect.disabled = false;
+      // Try to populate local levels if a local select exists for this form
+      try { if (districtSelect.id === 'complaintDistrict') loadComplaintLocals(); } catch(e){}
     } else { districtSelect.disabled = true; }
 }
+
+function loadInvestigationDistricts() {
+    const provinceSelect = document.getElementById('province');
+    const districtSelect = document.getElementById('district');
+    if (!provinceSelect || !districtSelect) return;
+    
+    const provinceId = provinceSelect.value;
+    districtSelect.innerHTML = '<option value="">जिल्ला छन्नुहोस्</option>';
+    
+    if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
+        LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => {
+            const option = document.createElement('option');
+            option.value = dist;
+            option.textContent = dist;
+            districtSelect.appendChild(option);
+        });
+        districtSelect.disabled = false;
+        try { if (districtSelect.id === 'district') loadInvestigationLocals(); } catch(e){}
+    } else {
+        districtSelect.disabled = true;
+    }
+}
+
+  function loadOcDistricts() {
+    const provinceSelect = document.getElementById('oc_province');
+    const districtSelect = document.getElementById('oc_district');
+    if (!provinceSelect || !districtSelect) return;
+    const provinceId = provinceSelect.value;
+    districtSelect.innerHTML = '<option value="">जिल्ला छन्नुहोस्</option>';
+    if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
+      LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => {
+        const option = document.createElement('option');
+        option.value = dist;
+        option.textContent = dist;
+        districtSelect.appendChild(option);
+      });
+      districtSelect.disabled = false;
+      try { if (districtSelect.id === 'oc_district') loadOcLocals(); } catch(e){}
+    } else {
+      districtSelect.disabled = true;
+    }
+  }
+
+  // Edit form specific loaders (editProvince/editDistrict/editLocalLevel)
+  function loadEditDistricts() {
+    const provinceSelect = document.getElementById('editProvince');
+    const districtSelect = document.getElementById('editDistrict');
+    if (!provinceSelect || !districtSelect) return;
+    const provinceId = provinceSelect.value;
+    districtSelect.innerHTML = '<option value="">जिल्ला छन्नुहोस्</option>';
+    if (provinceId && LOCATION_FIELDS.DISTRICTS[provinceId]) {
+      LOCATION_FIELDS.DISTRICTS[provinceId].forEach(dist => {
+        const option = document.createElement('option');
+        option.value = dist;
+        option.textContent = dist;
+        districtSelect.appendChild(option);
+      });
+      districtSelect.disabled = false;
+      try { if (districtSelect.id === 'editDistrict') loadEditLocals(); } catch(e){}
+    } else {
+      districtSelect.disabled = true;
+    }
+  }
+
+  function loadEditLocals() {
+    const provinceId = document.getElementById('editProvince')?.value || '';
+    const district = document.getElementById('editDistrict')?.value || '';
+    const localSelect = document.getElementById('editLocalLevel');
+    populateLocalSelect(provinceId, district, localSelect);
+  }
+
+// Populate a select element with local levels (municipalities) for a given provinceId and district
+function _populateLocalSelect(provinceId, districtName, selectEl) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">स्थानीय तह छान्नुहोस्</option>';
+  if (!provinceId || !districtName) { selectEl.disabled = true; return; }
+  const locals = (LOCATION_FIELDS.MUNICIPALITIES && LOCATION_FIELDS.MUNICIPALITIES[provinceId] && LOCATION_FIELDS.MUNICIPALITIES[provinceId][districtName]) || [];
+  if (locals && locals.length > 0) {
+    locals.forEach(l => { const o = document.createElement('option'); o.value = l; o.textContent = l; selectEl.appendChild(o); });
+    selectEl.disabled = false;
+  } else {
+    // If no predefined locals, provide a freeform 'Other / Type manually' option
+    const o = document.createElement('option'); o.value = ''; o.textContent = 'अन्य (म्यानुअली प्रविष्ट गर्न खाली छोड्नुहोस्)'; selectEl.appendChild(o);
+    selectEl.disabled = false;
+  }
+  // If the select has a data-selected attribute (from edit forms), try to set it
+  try {
+    const selVal = selectEl.dataset && selectEl.dataset.selected ? selectEl.dataset.selected : selectEl.getAttribute('data-selected');
+    if (selVal) {
+      selectEl.value = selVal;
+      // if value not found in options, append it as option (preserve existing value)
+      if (!Array.from(selectEl.options).some(opt => opt.value === selVal)) {
+        const extra = document.createElement('option'); extra.value = selVal; extra.textContent = selVal; extra.selected = true; selectEl.appendChild(extra);
+      }
+    }
+  } catch(e) {}
+}
+
+NVC.Utils.populateLocalSelect = _populateLocalSelect;
+
+function populateLocalSelect(provinceId, districtName, selectEl) {
+  return NVC.Utils.populateLocalSelect.apply(this, arguments);
+}
+
+function _loadComplaintLocals() {
+  const provinceId = document.getElementById('complaintProvince')?.value || '';
+  const district = document.getElementById('complaintDistrict')?.value || '';
+  const localSelect = document.getElementById('complaintLocal');
+  populateLocalSelect(provinceId, district, localSelect);
+}
+
+NVC.Utils.loadComplaintLocals = _loadComplaintLocals;
+
+function loadComplaintLocals() {
+  return NVC.Utils.loadComplaintLocals.apply(this, arguments);
+}
+
+function _loadOcLocals() {
+  const provinceId = document.getElementById('oc_province')?.value || '';
+  const district = document.getElementById('oc_district')?.value || '';
+  const localSelect = document.getElementById('oc_localLevel');
+  populateLocalSelect(provinceId, district, localSelect);
+}
+
+NVC.Utils.loadOcLocals = _loadOcLocals;
+
+function loadOcLocals() {
+  return NVC.Utils.loadOcLocals.apply(this, arguments);
+}
+
+function _loadInvestigationLocals() {
+  const provinceId = document.getElementById('province')?.value || '';
+  const district = document.getElementById('district')?.value || '';
+  const localSelect = document.getElementById('localLevel');
+  populateLocalSelect(provinceId, district, localSelect);
+}
+
+NVC.Utils.loadInvestigationLocals = _loadInvestigationLocals;
+
+function loadInvestigationLocals() {
+  return NVC.Utils.loadInvestigationLocals.apply(this, arguments);
+}
+
+  function monitorHotspotAlerts() { /* Alert logic */ }
+
+// Test function - Manual online complaints load
+function testOnlineComplaintsLoad() {
+  console.log('testOnlineComplaintsLoad - Starting manual test...');
+  
+  // Reset loading flag
+  state._onlineComplaintsLoaded = false;
+  
+  // Load online complaints
+  loadOnlineComplaintsFromSheets().then(result => {
+    console.log('testOnlineComplaintsLoad - Result:', result);
+    console.log('testOnlineComplaintsLoad - State:', state.onlineComplaints);
+    
+    // Show online complaints view
+    showOnlineComplaintsView();
+  });
+  
+  return 'Manual online complaints load test started';
+}
+
+(function () {
+  try {
+    if (typeof NVC !== 'object' || !NVC) return;
+
+    NVC.Config = NVC.Config || {};
+    NVC.State = NVC.State || {};
+    NVC.Api = NVC.Api || {};
+    NVC.UI = NVC.UI || {};
+    NVC.Chatbot = NVC.Chatbot || {};
+    NVC.Utils = NVC.Utils || {};
+
+    try { NVC.Config.GOOGLE_SHEETS_CONFIG = GOOGLE_SHEETS_CONFIG; } catch (e) {}
+    try { NVC.Config.MINISTRIES = MINISTRIES; } catch (e) {}
+
+    try { NVC.State.state = state; } catch (e) {}
+
+    try { if (!NVC.Api.getFromGoogleSheets) NVC.Api.getFromGoogleSheets = getFromGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.postToGoogleSheets) NVC.Api.postToGoogleSheets = postToGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.loadDataFromGoogleSheets) NVC.Api.loadDataFromGoogleSheets = loadDataFromGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.testGoogleSheetsConnection) NVC.Api.testGoogleSheetsConnection = testGoogleSheetsConnection; } catch (e) {}
+    try { if (!NVC.Api.syncAllDataToGoogleSheets) NVC.Api.syncAllDataToGoogleSheets = syncAllDataToGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.submitForm) NVC.Api.submitForm = submitForm; } catch (e) {}
+    try { if (!NVC.Api.saveComplaintToGoogleSheets) NVC.Api.saveComplaintToGoogleSheets = saveComplaintToGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.updateComplaintInGoogleSheets) NVC.Api.updateComplaintInGoogleSheets = updateComplaintInGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.saveProjectToGoogleSheets) NVC.Api.saveProjectToGoogleSheets = saveProjectToGoogleSheets; } catch (e) {}
+    try { if (!NVC.Api.generateReportFromGoogleSheets) NVC.Api.generateReportFromGoogleSheets = generateReportFromGoogleSheets; } catch (e) {}
+
+    try { if (!NVC.UI.openAdminLogin) NVC.UI.openAdminLogin = openAdminLogin; } catch (e) {}
+    try { if (!NVC.UI.openReports) NVC.UI.openReports = openReports; } catch (e) {}
+    try { if (!NVC.UI.openShakhaSelection) NVC.UI.openShakhaSelection = openShakhaSelection; } catch (e) {}
+    try { if (!NVC.UI.closeModal) NVC.UI.closeModal = closeModal; } catch (e) {}
+    try { if (!NVC.UI.viewComplaint) NVC.UI.viewComplaint = viewComplaint; } catch (e) {}
+    try { if (!NVC.UI.deleteComplaint) NVC.UI.deleteComplaint = deleteComplaint; } catch (e) {}
+    try { if (!NVC.UI.logout) NVC.UI.logout = logout; } catch (e) {}
+
+    try { if (!NVC.Chatbot.toggleChatbot) NVC.Chatbot.toggleChatbot = toggleChatbot; } catch (e) {}
+    try { if (!NVC.Chatbot.sendChatMessage) NVC.Chatbot.sendChatMessage = sendChatMessage; } catch (e) {}
+    try { if (!NVC.Chatbot.AI_SYSTEM) NVC.Chatbot.AI_SYSTEM = AI_SYSTEM; } catch (e) {}
+
+    try { if (!NVC.Utils.getCurrentNepaliDate) NVC.Utils.getCurrentNepaliDate = getCurrentNepaliDate; } catch (e) {}
+    try { if (!NVC.Utils.initializeNepaliDropdowns) NVC.Utils.initializeNepaliDropdowns = initializeNepaliDropdowns; } catch (e) {}
+    try { if (!NVC.Utils.populateLocalSelect) NVC.Utils.populateLocalSelect = populateLocalSelect; } catch (e) {}
+    try { if (!NVC.Utils.loadComplaintLocals) NVC.Utils.loadComplaintLocals = loadComplaintLocals; } catch (e) {}
+    try { if (!NVC.Utils.loadOcLocals) NVC.Utils.loadOcLocals = loadOcLocals; } catch (e) {}
+    try { if (!NVC.Utils.loadInvestigationLocals) NVC.Utils.loadInvestigationLocals = loadInvestigationLocals; } catch (e) {}
+  } catch (e) {}
+})();
