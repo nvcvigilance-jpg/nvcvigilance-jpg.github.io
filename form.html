@@ -1,27 +1,35 @@
 <!DOCTYPE html>
 <html lang="ne">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>अनलाइन उजुरी दर्ता - राष्ट्रिय सतर्कता केन्द्र</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
-  
-  <link href="https://nepalidatepicker.sajanmaharjan.com.np/v5/nepali.datepicker/css/nepali.datepicker.v5.0.6.min.css" rel="stylesheet"/>
+  <link rel="apple-touch-icon" href="emblem.webp">
+
+  <link href="https://nepalidatepicker.sajanmaharjan.com.np/v5/nepali.datepicker/css/nepali.datepicker.v5.0.6.min.css"
+    rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  
-  <script src="https://nepalidatepicker.sajanmaharjan.com.np/v5/nepali.datepicker/js/nepali.datepicker.v5.0.6.min.js"></script>
+
+  <script
+    src="https://nepalidatepicker.sajanmaharjan.com.np/v5/nepali.datepicker/js/nepali.datepicker.v5.0.6.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="nepal-laws-db-catalog.js"></script>
   <!-- नेपाली फन्टहरू -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
   <style>
     :root {
-      --primary: #c41e3a;     /* नेपालको रातो */
-      --secondary: #003087;   /* नेपालको निलो */
+      --primary: #c41e3a;
+      /* नेपालको रातो */
+      --secondary: #003087;
+      /* नेपालको निलो */
       --accent: #27ae60;
       --light: #f8f9fa;
       --gray: #6c757d;
       --border: #dee2e6;
-      --shadow: 0 15px 35px rgba(0,0,0,0.1);
+      --shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
     }
 
     * {
@@ -31,10 +39,10 @@
     }
 
     body {
-      font-family:  "Segoe UI", Roboto, Arial, sans-serif, kalimati;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif, kalimati;
       background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
       min-height: 100vh;
-      padding: 20px 10px;
+      padding: 10px 10px;
       line-height: 1.6;
     }
 
@@ -49,38 +57,58 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .header {
-      background: linear-gradient(135deg, var(--primary) 0%, #d6334c 50%, var(--secondary) 100%);
-      color: white;
-      padding: 8px 10px; /* slightly reduced for compact header */
-      text-align: center;
       position: relative;
       overflow: hidden;
+      color: rgb(132, 17, 17);
+      padding: 20px 10px 18px;
+      text-align: center;
+      background-image: linear-gradient(rgba(255, 247, 230, 0.55), rgba(255, 247, 230, 0.6)),
+        url('homepage-bg.webp');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      isolation: isolate;
+      line-height: 1.3;
     }
 
     .header::before {
       content: '';
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><defs><pattern id="grain" width="100" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="%23ffffff20"/><circle cx="50" cy="5" r="1.5" fill="%23ffffff15"/><circle cx="90" cy="15" r="1" fill="%23ffffff20"/></pattern></defs><rect width="100" height="20" fill="url(%23grain)"/></svg>');
-      opacity: 0.3;
+      inset: 0;
+      background: rgba(255, 244, 224, 0.15);
+      backdrop-filter: blur(0.5px);
+      z-index: 0;
+    }
+
+    .header > * {
+      position: relative;
+      z-index: 1;
     }
 
     .header img {
-      height: 60px; /* reduced ~25% from 80px */
+      height: 60px;
+      /* reduced ~25% from 80px */
       margin-bottom: 8px;
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
     }
 
     .header h1 {
       font-size: 1.4rem;
       font-weight: 700;
       margin-bottom: 6px;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .header p {
@@ -90,7 +118,7 @@
     }
 
     .form-body {
-      padding: 30px 22px;
+      padding: 8px 12px;
     }
 
     .form-grid {
@@ -122,10 +150,10 @@
     input[type="text"],
     textarea {
       width: 100%;
-      padding: 13px 14px;
+      padding: 8px 14px;
       border: 2px solid var(--border);
       border-radius: 14px;
-      font-size: 1.05rem;
+      font-size: 0.9rem;
       background: #fdfdfd;
       transition: all 0.3s ease;
       font-family: inherit;
@@ -151,7 +179,7 @@
 
     .submit-btn {
       grid-column: 1 / -1;
-      padding: 18px 30px;
+      padding: 9px 30px;
       background: linear-gradient(to right, var(--primary), #d6334c);
       color: white;
       border: none;
@@ -160,7 +188,7 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.4s ease;
-      margin-top: 15px;
+      margin-top: 8px;
       box-shadow: 0 8px 25px rgba(196, 30, 58, 0.3);
     }
 
@@ -182,46 +210,59 @@
     /* मोबाइल ऑप्टिमाइजेशन */
     @media (max-width: 768px) {
       .form-body {
-        padding: 15px 10px;
+        padding: 8px 5px;
       }
+
       .form-grid {
         grid-template-columns: 1fr;
-        gap: 15px;
+        gap: 8px;
       }
+
       .header {
-        padding: 12px 10px; /* keep compact on tablet */
+        padding: 6px 5px;
+        /* keep compact on tablet */
       }
+
       .header img {
-        height: 48px;
+        height: 34px;
       }
+
       .header h1 {
-        font-size: 1.15rem;
+        font-size: 1.1rem;
       }
     }
 
     @media (max-width: 480px) {
       body {
-        padding: 10px 5px;
+        padding: 2px 3px;
       }
+
       .form-body {
-        padding: 15px 10px;
+        padding: 8px 5px;
       }
-      input, textarea {
-        padding: 10px 12px;
+
+      input,
+      textarea {
+        padding: 5px 10px;
         font-size: 1rem;
       }
+
       .submit-btn {
-        font-size: 1rem;
-        padding: 8px 8px;
+        font-size: 0.8rem;
+        padding: 4px 4px;
       }
+
       .header {
-        padding: 10px 8px; /* extra compact on small screens */
+        padding: 5px 4px;
+        /* extra compact on small screens */
       }
+
       .header img {
-        height: 36px;
+        height: 24px;
       }
+
       .header h1 {
-        font-size: 1rem;
+        font-size: 0.9rem;
       }
 
       /* Keep response message visible without forcing page scroll */
@@ -232,7 +273,7 @@
         bottom: 12px;
         margin-top: 0 !important;
         z-index: 9999;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
         border-radius: 12px;
       }
     }
@@ -241,131 +282,253 @@
     #responseMessage {
       transition: transform 0.18s ease, opacity 0.18s ease;
     }
+
+    /* Laws Analysis Section */
+    .laws-analysis {
+      grid-column: 1 / -1;
+      display: none;
+      margin-top: 10px;
+      border: 2px solid #e8e8e8;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #fefefe 0%, #f8f9ff 100%);
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .laws-analysis.visible {
+      display: block;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .laws-analysis-header {
+      background: linear-gradient(135deg, var(--secondary) 0%, #1a4fa0 100%);
+      color: white;
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .laws-analysis-body {
+      padding: 14px 16px;
+    }
+
+    .laws-analysis .analysis-label {
+      font-weight: 600;
+      color: var(--secondary);
+      font-size: 0.95rem;
+      margin: 10px 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .laws-analysis .analysis-label:first-child {
+      margin-top: 0;
+    }
+
+    .laws-analysis .law-item {
+      background: white;
+      border: 1px solid #e0e7ff;
+      border-left: 4px solid var(--secondary);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+    }
+
+    .laws-analysis .law-item .law-name {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+
+    .laws-analysis .law-item .law-section {
+      color: #444;
+      font-size: 0.88rem;
+      padding-left: 10px;
+      border-left: 2px solid var(--border);
+      margin-top: 4px;
+    }
+
+    .laws-analysis .decision-box {
+      background: #f0f7ff;
+      border: 1px solid #b6d4fe;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.93rem;
+      color: #084298;
+      line-height: 1.6;
+    }
+
+    .laws-analysis .analyzing-indicator {
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      padding: 8px;
+    }
+
+    .laws-analysis .analyzing-indicator i {
+      animation: spin 1s linear infinite;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .laws-analysis .law-item {
+        padding: 8px 10px;
+        font-size: 0.88rem;
+      }
+
+      .laws-analysis .decision-box {
+        font-size: 0.88rem;
+        padding: 10px 12px;
+      }
+    }
   </style>
 </head>
-<body>
-<form id="complaintForm">
-  <div class="container">
-    <div class="header">
-      <img src="emblem.webp" alt="नेपाल सरकार" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Emblem_of_Nepal.svg/200px-Emblem_of_Nepal.svg.png'; this.onerror=function(){this.style.display='none'; document.getElementById('emblem-fallback').style.display='block';};">
-      <div id="emblem-fallback" style="display: none; font-size: 3rem; color: white; margin-bottom: 15px;">🇳🇵</div>
-      <h5>नेपाल सरकार</h5>
-      <h4>राष्ट्रिय सतर्कता केन्द्र</h4>
-      <p>अनलाइन उजुरी दर्ता</p>
-    </div>
 
-    <div class="form-body">
-     
+<body>
+  <form id="complaintForm">
+    <div class="container">
+      <div class="header">
+        <img src="emblem.webp" alt="नेपाल सरकार"
+          onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Emblem_of_Nepal.svg/200px-Emblem_of_Nepal.svg.png'; this.onerror=function(){this.style.display='none'; document.getElementById('emblem-fallback').style.display='block';};">
+        <div id="emblem-fallback" style="display: none; font-size: 3rem; color: white; margin-bottom: 15px;">🇳🇵</div>
+        <h6>नेपाल सरकार</h6>
+        <h5>राष्ट्रिय सतर्कता केन्द्र</h5>
+        <p style="color: #041e4e; font-weight: 700; font-size: medium;">अनलाइन उजुरी दर्ता</p>
+      </div>
+
+      <div class="form-body">
+
         <div class="form-grid">
-          
+
           <div class="form-group" style="display: none;">
             <label for="reg_date"><i class="fas fa-calendar-alt"></i> मिति (नेपाली)</label>
-            <input type="text" id="reg_date" readonly style="background-color: #f8f9fa; cursor: not-allowed; color: #495057;">
+            <input type="text" id="reg_date" readonly
+              style="background-color: #f8f9fa; cursor: not-allowed; color: #495057;">
           </div>
 
           <div class="form-group">
-            <label for="complainer_name"><i class="fas fa-user"></i> उजुरीकर्ताको नाम र ठेगाना</label>
-            <input type="text" id="complainer_name" name="entry.2005620554" placeholder="उजुरकर्ताको नाम र ठेगाना (ऐच्छिक)">
+            <label for="complainer_name" style="font-size: small;"><i class="fas fa-user"></i> उजुरीकर्ताको नाम र ठेगाना</label>
+            <input type="text" id="complainer_name" name="entry.2005620554"
+              placeholder="उजुरकर्ताको नाम र ठेगाना (ऐच्छिक)">
           </div>
 
           <div class="form-group">
-            <label for="opponent_name"><i class="fas fa-user-slash"></i> विपक्षी <span style="color: var(--primary);">*</span></label>
-            <input type="text" id="opponent_name" name="entry.1065046570" placeholder="विपक्षी (व्यक्ति वा संस्था)" required>
+            <label for="opponent_name" style="font-size: small;"><i class="fas fa-user-slash"></i> विपक्षी <span
+                style="color: var(--primary);">*</span></label>
+            <input type="text" id="opponent_name" name="entry.1065046570" placeholder="विपक्षी (व्यक्ति वा संस्था)"
+              required>
           </div>
 
           <div class="form-group" style="grid-column: 1 / -1;">
-            <label for="complaint_detail"><i class="fas fa-file-alt"></i> उजुरीको विवरण <span style="color: var(--primary);">*</span></label>
-            <textarea id="complaint_detail" name="entry.1166974658" placeholder="उजुरीको मुख्य विषय लेख्नुहोस्..." required></textarea>
+            <label for="complaint_detail" style="font-size: small;"><i class="fas fa-file-alt"></i> उजुरीको विवरण <span
+                style="color: var(--primary);">*</span></label>
+            <textarea id="complaint_detail" name="entry.1166974658" placeholder="उजुरीको मुख्य विषय लेख्नुहोस्..."
+              required></textarea>
           </div>
 
           <div class="form-group" style="grid-column: 1 / -1;">
-            <label for="remarks"><i class="fas fa-users"></i> अन्य आवश्यक कुरा</label>
-            <textarea id="remarks" name="entry.839337160" placeholder="अन्य जानकारी (ऐच्छिक)"></textarea> 
+            <label for="remarks"><i class="fas fa-users" style="font-size: small;"></i> अन्य आवश्यक कुरा</label>
+            <textarea id="remarks" name="entry.839337160" placeholder="अन्य जानकारी (ऐच्छिक)" style="min-height: 105px;"></textarea>
           </div>
 
           <button type="submit" class="submit-btn">
             <i class="fas fa-paper-plane"></i> उजुरी दर्ता गर्नुहोस्
           </button>
-          <div id="responseMessage" style="grid-column: 1 / -1; display: none; padding: 15px; border-radius: 12px; text-align: center; margin-top: 10px; font-weight: 600;"></div>
+          <div id="responseMessage"
+            style="grid-column: 1 / -1; display: none; padding: 15px; border-radius: 12px; text-align: center; margin-top: 10px; font-weight: 600;">
+          </div>
         </div>
-      
+
+      </div>
     </div>
-  </div>
 
- </form>
-<script>
-  // Set current Nepali Date on load
-  window.onload = function() {
-    try {
-      var today = new Date();
-      var bsObj = NepaliFunctions.AD2BS({
-        year: today.getFullYear(),
-        month: today.getMonth() + 1,
-        day: today.getDate()
-      });
-      // Format: YYYY-MM-DD
-      var bsDate = bsObj.year + '-' + String(bsObj.month).padStart(2, '0') + '-' + String(bsObj.day).padStart(2, '0');
-      document.getElementById('reg_date').value = bsDate;
-    } catch (e) {
-      console.error("Nepali Date Error:", e);
-      // Fallback to AD date if library fails
-      document.getElementById('reg_date').value = new Date().toISOString().split('T')[0];
-    }
-  };
+  </form>
+  <script>
+    // Set current Nepali Date on load
+    window.onload = function () {
+      try {
+        var today = new Date();
+        var bsObj = NepaliFunctions.AD2BS({
+          year: today.getFullYear(),
+          month: today.getMonth() + 1,
+          day: today.getDate()
+        });
+        // Format: YYYY-MM-DD
+        var bsDate = bsObj.year + '-' + String(bsObj.month).padStart(2, '0') + '-' + String(bsObj.day).padStart(2, '0');
+        document.getElementById('reg_date').value = bsDate;
+      } catch (e) {
+        console.error("Nepali Date Error:", e);
+        // Fallback to AD date if library fails
+        document.getElementById('reg_date').value = new Date().toISOString().split('T')[0];
+      }
+    };
 
-  document.getElementById('complaintForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    var btn = document.querySelector('.submit-btn');
-    var originalHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> पठाउँदै...';
-    
-    var msgEl = document.getElementById('responseMessage');
-    msgEl.style.display = 'none';
+    document.getElementById('complaintForm').addEventListener('submit', function (e) {
+      e.preventDefault();
 
-    var params = new URLSearchParams();
-    params.append('action', 'saveOnlineComplaint');
-    params.append('apiKey', 'nvc2026secretkey');
-    params.append('complainant', document.getElementById('complainer_name').value);
-    params.append('accused', document.getElementById('opponent_name').value);
-    params.append('description', document.getElementById('complaint_detail').value);
-    params.append('remarks', document.getElementById('remarks').value);
-    params.append('date', document.getElementById('reg_date').value);
+      var btn = document.querySelector('.submit-btn');
+      var originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> पठाउँदै...';
 
-    fetch('https://script.google.com/macros/s/AKfycbxCQoRYpG34LTUeq2ONR_W6OEO7UEwAEagyyLq8dP4ylM5hhXJYICUWDnfYQ4YpJJ9jJQ/exec', {
+      var msgEl = document.getElementById('responseMessage');
+      msgEl.style.display = 'none';
+
+      var params = new URLSearchParams();
+      params.append('action', 'saveOnlineComplaint');
+      params.append('apiKey', 'nvc2026secretkey');
+      params.append('complainant', document.getElementById('complainer_name').value);
+      params.append('accused', document.getElementById('opponent_name').value);
+      params.append('description', document.getElementById('complaint_detail').value);
+      params.append('remarks', document.getElementById('remarks').value);
+      params.append('date', document.getElementById('reg_date').value);
+
+      fetch('https://script.google.com/macros/s/AKfycbyQPr-7kJsrPqKEJRrMx-CIyjOhSWkqTiYTpSbXBjlkDotbUXTyxntPdFxbkhY0xWbsew/exec', {
         method: 'POST',
         body: params
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
             msgEl.style.display = 'block';
             msgEl.style.backgroundColor = '#d4edda';
             msgEl.style.color = '#155724';
             msgEl.style.border = '1px solid #c3e6cb';
             msgEl.innerHTML = '<i class="fas fa-check-circle"></i> तपाईंको उजुरी सफलतापूर्वक दर्ता भयो। थप जानकारीका लागि ०१-४२००३४५ मा सम्पर्क गर्नुहोला!';
             document.getElementById('complaintForm').reset();
-            setTimeout(function() {
-                msgEl.style.display = 'none';
+            setTimeout(function () {
+              msgEl.style.display = 'none';
             }, 5000);
-        } else {
+          } else {
             throw new Error(data.message || 'Unknown error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        msgEl.style.display = 'block';
-        msgEl.style.backgroundColor = '#f8d7da';
-        msgEl.style.color = '#721c24';
-        msgEl.style.border = '1px solid #f5c6cb';
-        msgEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> उजुरी दर्ता गर्दा समस्या आयो। कृपया पुनः प्रयास गर्नुहोस्।';
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = originalHTML;
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          msgEl.style.display = 'block';
+          msgEl.style.backgroundColor = '#f8d7da';
+          msgEl.style.color = '#721c24';
+          msgEl.style.border = '1px solid #f5c6cb';
+          msgEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> उजुरी दर्ता गर्दा समस्या आयो। कृपया पुनः प्रयास गर्नुहोस्।';
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        });
     });
-  });
-</script>
+  </script>
 </body>
+
 </html>
